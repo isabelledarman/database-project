@@ -1,0 +1,3 @@
+pymysql
+Flask   # only needed for the web app (view.py)
+python-dotenv

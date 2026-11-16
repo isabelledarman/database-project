@@ -1,0 +1,196 @@
+"""Database layer: every SQL query in the project lives in this file.
+
+Both front-ends use this same class:
+  - view.py  (web app, Flask)
+  - main.py  (command-line app, no web server)
+"""
+
+import pymysql
+
+# Every table in the schema, parents first (matches the order in schema.sql)
+TABLES = [
+    'Hotel', 'Amenity', 'Hotel_Amenity', 'Conference_Room',
+    'Room_Location', 'Room_Bed', 'Room_Type', 'Room',
+    'Guest', 'Credit_Card', 'Reservation', 'Reservation_Room',
+    'Charge', 'Bonus',
+]
+
+
+class Database(object):
+    """Database object to handle all DB operations"""
+
+    def __init__(self, opts):
+        """Initialize and connect to the database"""
+        self.opts = opts
+        self.__connect()
+
+    def __connect(self):
+        """Establish the MySQL connection"""
+        self.conn = pymysql.connect(
+            host=self.opts.DB_HOST,
+            user=self.opts.DB_USER,
+            password=self.opts.DB_PASSWORD,
+            database=self.opts.DB_NAME,
+            # Read-only usage: autocommit stops a long-lived connection from
+            # showing a stale snapshot of the data on later page loads.
+            autocommit=True
+        )
+
+    def close(self):
+        """Close the connection when the program ends"""
+        self.conn.close()
+
+    def _query(self, sql, params=()):
+        """Run a SELECT and return every row as a dict.
+
+        Always pass user-supplied values through `params` (%s placeholders)
+        so they are escaped by the driver and cannot cause SQL injection.
+        """
+        cur = self.conn.cursor(pymysql.cursors.DictCursor)
+        try:
+            cur.execute(sql, params)
+            return cur.fetchall()
+        finally:
+            cur.close()
+
+    # ---------- Read operations ----------
+
+    def get_all_data(self):
+        """Fetch everything in the database, organized for display.
+
+        Returns a dict with these keys:
+          hotels        each hotel with its amenities, conference_rooms and rooms
+          reservations  each reservation with guest, card (last 4 only), rooms, charges, total
+          guests        each guest with their reservation count
+          bonuses       each bonus mailing with the guest's name
+          counts        {table name: number of rows}, for every table
+        """
+        # --- Hotels, with everything that belongs to each one ---
+        hotels = self._query('SELECT hotel_id, name, address, city, rating '
+                             'FROM Hotel ORDER BY hotel_id')
+        for hotel in hotels:
+            hid = hotel['hotel_id']
+            hotel['amenities'] = self._query('''
+                SELECT a.name, ha.charge
+                FROM Hotel_Amenity ha
+                JOIN Amenity a ON a.amenity_id = ha.amenity_id
+                WHERE ha.hotel_id = %s
+                ORDER BY a.name''', (hid,))
+            hotel['conference_rooms'] = self._query('''
+                SELECT conf_room_no, capacity
+                FROM Conference_Room
+                WHERE hotel_id = %s
+                ORDER BY conf_room_no''', (hid,))
+            hotel['rooms'] = self._query('''
+                SELECT r.room_no, r.floor, r.location, r.bed,
+                       r.smoking, r.accessible, rt.rate
+                FROM Room r
+                JOIN Room_Type rt
+                  ON rt.hotel_id = r.hotel_id AND rt.bed = r.bed
+                 AND rt.smoking = r.smoking   AND rt.accessible = r.accessible
+                WHERE r.hotel_id = %s
+                ORDER BY r.room_no''', (hid,))
+
+        # --- Reservations, with rooms and charges ---
+        reservations = self._query('''
+            SELECT res.reservation_no, res.booking_date, res.status, res.cancel_date,
+                   g.name AS guest_name, g.phone AS guest_phone,
+                   cc.holder_name, RIGHT(cc.card_no, 4) AS card_last4
+            FROM Reservation res
+            JOIN Guest g        ON g.user_id = res.user_id
+            JOIN Credit_Card cc ON cc.card_no = res.card_no
+            ORDER BY res.reservation_no''')
+        for res in reservations:
+            rno = res['reservation_no']
+            res['rooms'] = self._query('''
+                SELECT h.name AS hotel_name, rr.room_no, rr.check_in, rr.check_out,
+                       DATEDIFF(rr.check_out, rr.check_in) AS nights
+                FROM Reservation_Room rr
+                JOIN Hotel h ON h.hotel_id = rr.hotel_id
+                WHERE rr.reservation_no = %s
+                ORDER BY rr.room_no''', (rno,))
+            res['charges'] = self._query('''
+                SELECT charge_id, amount, reason, charge_type, charge_date
+                FROM Charge
+                WHERE reservation_no = %s
+                ORDER BY charge_date, charge_id''', (rno,))
+            res['total'] = sum(c['amount'] for c in res['charges'])
+
+        # --- Guests and bonuses ---
+        guests = self._query('''
+            SELECT g.user_id, g.name, g.phone, g.address,
+                   COUNT(res.reservation_no) AS reservation_count
+            FROM Guest g
+            LEFT JOIN Reservation res ON res.user_id = g.user_id
+            GROUP BY g.user_id, g.name, g.phone, g.address
+            ORDER BY g.user_id''')
+        bonuses = self._query('''
+            SELECT g.name AS guest_name, b.year, b.mailed_date
+            FROM Bonus b
+            JOIN Guest g ON g.user_id = b.user_id
+            ORDER BY b.year, g.name''')
+
+        # --- Row count of every table (names come from the TABLES constant, never from users) ---
+        counts = {}
+        for table in TABLES:
+            counts[table] = self._query(f'SELECT COUNT(*) AS n FROM {table}')[0]['n']
+
+        return {
+            'hotels': hotels,
+            'reservations': reservations,
+            'guests': guests,
+            'bonuses': bonuses,
+            'counts': counts,
+        }
+
+    def display_all(self):
+        """Print everything in the database to the console, grouped by topic."""
+        data = self.get_all_data()
+        yes_no = lambda value: 'yes' if value else '-'
+        line = '=' * 64
+
+        print(line)
+        print('HOTELS')
+        print(line)
+        for h in data['hotels']:
+            print(f"\n{h['name']}  ({'*' * h['rating']})  {h['address']}, {h['city']}")
+            print('  Rooms:')
+            for r in h['rooms']:
+                print(f"    #{r['room_no']:<5} floor {r['floor']:<3} {r['location']:<14} "
+                      f"{r['bed']:<7} smoking: {yes_no(r['smoking']):<4} "
+                      f"accessible: {yes_no(r['accessible']):<4} ${r['rate']:>7.2f}/night")
+            print('  Amenities:')
+            for a in h['amenities']:
+                price = 'free' if a['charge'] == 0 else f"${a['charge']:.2f}"
+                print(f"    {a['name']:<16} {price}")
+            print('  Conference rooms:')
+            for c in h['conference_rooms']:
+                print(f"    Room {c['conf_room_no']:<5} seats {c['capacity']}")
+
+        print(f"\n{line}\nRESERVATIONS\n{line}")
+        for res in data['reservations']:
+            print(f"\n#{res['reservation_no']}  {res['status']}  "
+                  f"booked {res['booking_date']}  guest: {res['guest_name']}  "
+                  f"card ending {res['card_last4']}")
+            if res['cancel_date']:
+                print(f"  cancelled {res['cancel_date']}")
+            for room in res['rooms']:
+                print(f"  {room['hotel_name']}, room {room['room_no']}: "
+                      f"{room['check_in']} to {room['check_out']} ({room['nights']} nights)")
+            for c in res['charges']:
+                print(f"  charge #{c['charge_id']}  {c['charge_date']}  "
+                      f"{c['charge_type']:<8} ${c['amount']:>8.2f}  {c['reason']}")
+            print(f"  total charged: ${res['total']:.2f}")
+
+        print(f"\n{line}\nGUESTS\n{line}")
+        for g in data['guests']:
+            print(f"  {g['name']:<14} {g['phone']}  {g['address']}  "
+                  f"({g['reservation_count']} reservations)")
+
+        print(f"\n{line}\nBONUS MAILINGS\n{line}")
+        for b in data['bonuses']:
+            print(f"  {b['year']}  {b['guest_name']:<14} mailed {b['mailed_date']}")
+
+        print(f"\n{line}\nROW COUNTS\n{line}")
+        for table, n in data['counts'].items():
+            print(f"  {table:<18} {n}")
