@@ -5,7 +5,7 @@ Run with:  python view.py   then open http://127.0.0.1:5001/
 """
 
 # third party modules
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, render_template, send_from_directory, request
 
 # project modules
 import config
@@ -25,13 +25,30 @@ app.debug = config.APP_DEBUG
 @app.route('/', methods=['GET'])
 def index():
     """Display everything in the database, organized by hotel, reservation, guest and bonus"""
-    return render_template('index.html', data=db.get_all_data())
+    return render_template('index.html')
 
+@app.route('/all', methods=['GET'])
+def show_all():
+    return render_template('all.html', data=db.get_all_data())
 
 @app.route('/resources/<path:path>')
 def send_resources(path):
     """Serve CSS, images, etc."""
     return send_from_directory('resources', path)
+
+@app.route('/query/1', methods = ['GET'])
+def query1():
+    city = request.args.get('city', '')
+    bed = request.args.get('bed', '')
+    smoking = request.args.get('smoking', '0')=='1'
+    check_in = request.args.get('check_in', '')
+    check_out = request.args.get('check_out', '')
+
+    rows = None
+    if city and bed and check_in and check_out:
+        rows = db.available_rooms(city, bed, smoking, check_in, check_out)
+
+    return render_template('query1.html', rows = rows, cities = db.get_cities(), beds = db.get_beds())
 
 
 if __name__ == '__main__':

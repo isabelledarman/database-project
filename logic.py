@@ -31,6 +31,7 @@ class Database(object):
             user=self.opts.DB_USER,
             password=self.opts.DB_PASSWORD,
             database=self.opts.DB_NAME,
+            unix_socket='/tmp/mysql.sock',
             # Read-only usage: autocommit stops a long-lived connection from
             # showing a stale snapshot of the data on later page loads.
             autocommit=True
@@ -194,3 +195,26 @@ class Database(object):
         print(f"\n{line}\nROW COUNTS\n{line}")
         for table, n in data['counts'].items():
             print(f"  {table:<18} {n}")
+
+    def get_cities(self):
+        return self._query('SELECT DISTINCT city FROM Hotel ORDER BY city')
+
+    def get_beds(self):
+            return self._query('SELECT bed FROM Room_bed ORDER BY bed')
+
+    def available_rooms(self, city, bed, smoking, check_in, check_out):
+        return self._query('''
+            SELECT h.name as hotel, r.room_no AS room, r.floor, r.location, r.bed, r.accessible, rt.rate
+            FROM Room r
+            JOIN Hotel h ON h.hotel_id = r.hotel_id
+            JOIN Room_Type rt ON rt.hotel_id = r.hotel_id AND rt.bed = r.bed AND rt.smoking = r.smoking AND rt.accessible = r.accessible
+            WHERE h.city = %s AND r.bed = %s and r.smoking = %s
+                AND NOT EXISTS(
+                    SELECT 1
+                    FROM Reservation_Room rr
+                    JOIN Reservation res on res.reservation_no = rr.reservation_no
+                    WHERE rr.hotel_id = r.hotel_id AND rr.room_no = r.room_no AND res.status <> 'Cancelled' AND rr.check_in < %s AND rr.check_out > %s
+                )
+            ORDER BY h.name, r.room_no
+        ''',
+        (city, bed, smoking, check_out, check_in))
