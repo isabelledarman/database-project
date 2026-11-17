@@ -50,6 +50,36 @@ def query1():
 
     return render_template('query1.html', rows = rows, cities = db.get_cities(), beds = db.get_beds())
 
+@app.route('/query/2', methods = ['GET'])
+def query2():
+    city = request.args.get('city', '')
+    check_in = request.args.get('check_in', '')
+    check_out = request.args.get('check_out', '')
+    
+    rows = None
+    if city and check_in and check_out:
+        rows = db.available_accessible_rooms(city, check_in, check_out)
+    
+    return render_template('query2.html', rows = rows, cities = db.get_cities())
+
+@app.route('/query/3', methods = ['GET'])
+def query3():
+    city = request.args.get('city','')
+    rows = None
+    if city:
+        rows = db.mountain_or_ocean(city)
+    return render_template('query3.html', rows = rows, cities = db.get_cities())
+    
+
+@app.route('/query/4', methods = ['GET'])
+def query4():
+    name = request.args.get('name','')
+    phone = request.args.get('phone','')
+    rows = None
+    if name and phone:
+        rows = db.reservations_by_person(name, phone)
+    return render_template('query4.html', rows = rows)
+    
 
 if __name__ == '__main__':
     app.run(host=app.host, port=app.port, debug=app.debug)

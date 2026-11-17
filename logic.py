@@ -204,7 +204,7 @@ class Database(object):
 
     def available_rooms(self, city, bed, smoking, check_in, check_out):
         return self._query('''
-            SELECT h.name as hotel, r.room_no AS room, r.floor, r.location, r.bed, r.accessible, rt.rate
+            SELECT h.name as hotel, r.room_no AS room, r.floor, r.location, r.bed, IF(r.accessible, 'Yes', 'No') AS acessible, rt.rate
             FROM Room r
             JOIN Hotel h ON h.hotel_id = r.hotel_id
             JOIN Room_Type rt ON rt.hotel_id = r.hotel_id AND rt.bed = r.bed AND rt.smoking = r.smoking AND rt.accessible = r.accessible
@@ -218,3 +218,46 @@ class Database(object):
             ORDER BY h.name, r.room_no
         ''',
         (city, bed, smoking, check_out, check_in))
+
+    def available_accessible_rooms(self, city, check_in, check_out):
+        return self._query('''
+            SELECT h.name AS hotel, r.room_no AS room, r.floor, r.location, r.bed, IF(r.smoking, 'Smoking', 'Non-smoking') AS smoking, rt.rate
+            FROM Room r
+            JOIN Hotel h on h.hotel_id = r.hotel_id
+            JOIN Room_Type rt on rt.hotel_id = r.hotel_id AND rt.bed = r.bed AND rt.smoking = r.smoking AND rt.accessible = r.accessible
+            WHERE h.city = %s AND r.accessible = True
+                AND NOT EXISTS(
+                    SELECT 1
+                    FROM Reservation_Room rr
+                    JOIN Reservation res on res.reservation_no = rr.reservation_no
+                    WHERE rr.hotel_id = r.hotel_id and rr.room_no = r.room_no AND res.status <> 'Cancelled' AND rr.check_in < %s AND rr.check_out > %s
+                )
+            ORDER BY h.name, r.room_no
+        ''',
+        (city, check_out, check_in))
+
+    def mountain_or_ocean(self, city):
+        return self._query('''
+            SELECT DISTINCT h.city, h.name AS name, h.address
+            FROM Hotel h
+            JOIN Room r on r.hotel_id = h.hotel_id
+            WHERE h.city = %s
+                AND (r.location LIKE '%%Mountain%%' OR r.location LIKE '%%Ocean%%')
+            ORDER BY h.city, h.name
+        ''',
+        (city,))
+
+    def reservations_by_person(self, name, phone_number):
+        return self._query('''
+            SELECT g.user_id, g.name, g.phone, r.reservation_no, r.status, r.booking_date,
+                    h.name AS hotel, h.city, rr.room_no AS room, rr.check_in, rr.check_out
+            FROM Guest g
+            JOIN Reservation r ON r.user_id = g.user_id
+            JOIN Reservation_Room rr on rr.reservation_no = r.reservation_no
+            JOIN Hotel h on h.hotel_id = rr.hotel_id
+            WHERE g.name = %s AND g.phone = %s
+            ORDER BY rr.check_in
+        ''',
+        (name, phone_number))
+
+    
