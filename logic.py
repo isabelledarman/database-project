@@ -5,6 +5,7 @@ Both front-ends use this same class:
   - main.py  (command-line app, no web server)
 """
 
+import datetime
 import pymysql
 
 # Every table in the schema, parents first (matches the order in schema.sql)
@@ -260,4 +261,137 @@ class Database(object):
         ''',
         (name, phone_number))
 
-    
+    def guest_charges_list(self, name, phone_number):
+        return self._query('''
+            SELECT c.charge_id, c.reservation_no, c.card_no, c.charge_type,
+                c.reason, c.amount, c.charge_date
+            FROM Guest g
+            JOIN Reservation r ON r.user_id = g.user_id
+            JOIN Charge c ON c.reservation_no = r.reservation_no
+            WHERE g.name = %s AND g.phone = %s
+            ORDER BY c.charge_date, c.charge_id
+        ''',
+        (name, phone_number))
+
+    # ---------- Generic add / edit / delete for ANY table ----------
+    # Column names come from information_schema and table names are checked
+    # against TABLES, so only values (never identifiers) come from the user,
+    # and values always go through %s placeholders.
+
+    def _check_table(self, table):
+        if table not in TABLES:
+            raise ValueError(f'Unknown table: {table}')
+
+    def _columns(self, table):
+        """Describe a table's columns: name, input kind, nullable, auto-increment, primary key."""
+        self._check_table(table)
+        rows = self._query('''
+            SELECT COLUMN_NAME AS name, DATA_TYPE AS data_type, COLUMN_TYPE AS column_type,
+                   IS_NULLABLE AS nullable, COLUMN_KEY AS col_key, EXTRA AS extra,
+                   CHARACTER_MAXIMUM_LENGTH AS maxlen
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s
+            ORDER BY ORDINAL_POSITION''', (table,))
+        cols = []
+        for r in rows:
+            dt = r['data_type'].lower()
+            if r['column_type'].lower().startswith('tinyint(1)'):
+                kind = 'bool'
+            elif dt in ('tinyint', 'smallint', 'mediumint', 'int', 'bigint'):
+                kind = 'int'
+            elif dt in ('decimal', 'float', 'double'):
+                kind = 'decimal'
+            elif dt == 'date':
+                kind = 'date'
+            elif dt in ('datetime', 'timestamp'):
+                kind = 'datetime'
+            else:
+                kind = 'text'
+            cols.append({
+                'name': r['name'],
+                'kind': kind,
+                'nullable': r['nullable'] == 'YES',
+                'auto': 'auto_increment' in (r['extra'] or '').lower(),
+                'pk': r['col_key'] == 'PRI',
+                'maxlen': r['maxlen'],
+            })
+        return cols
+
+    @staticmethod
+    def _to_form(col, value):
+        """Format a DB value as the string an HTML input expects."""
+        if value is None:
+            return ''
+        if col['kind'] == 'bool':
+            return '1' if value else '0'
+        if isinstance(value, datetime.datetime):
+            return value.strftime('%Y-%m-%dT%H:%M')
+        if isinstance(value, datetime.date):
+            return value.isoformat()
+        return str(value)
+
+    @staticmethod
+    def _coerce(col, raw):
+        """Turn a submitted form string into a value for the DB ('' becomes NULL if allowed)."""
+        raw = (raw or '').strip()
+        if raw == '':
+            if col['nullable'] or col['auto']:
+                return None
+            raise ValueError(f"{col['name']} is required.")
+        if col['kind'] == 'datetime':
+            raw = raw.replace('T', ' ')
+        return raw
+
+    def _execute(self, sql, params=()):
+        cur = self.conn.cursor()
+        try:
+            cur.execute(sql, params)
+            return cur.rowcount
+        finally:
+            cur.close()
+
+    @staticmethod
+    def _pk_where(cols, form):
+        pk = [c for c in cols if c['pk']]
+        where = ' AND '.join(f"`{c['name']}` = %s" for c in pk)
+        return where, [form.get('pk_' + c['name'], '') for c in pk]
+
+    def get_manage_data(self):
+        """Every table with its column info and rows, ready for the edit forms."""
+        tables = []
+        for table in TABLES:
+            cols = self._columns(table)
+            order = ', '.join(f"`{c['name']}`" for c in cols if c['pk'])
+            rows = self._query(f'SELECT * FROM `{table}` ORDER BY {order}')
+            tables.append({
+                'name': table,
+                'columns': cols,
+                'rows': [{c['name']: self._to_form(c, r[c['name']]) for c in cols} for r in rows],
+            })
+        return tables
+
+    def insert_row(self, table, form):
+        cols = self._columns(table)
+        names, vals = [], []
+        for c in cols:
+            raw = form.get('col_' + c['name'], '')
+            if c['auto'] and raw.strip() == '':
+                continue  # let AUTO_INCREMENT assign it
+            names.append(f"`{c['name']}`")
+            vals.append(self._coerce(c, raw))
+        sql = (f"INSERT INTO `{table}` ({', '.join(names)}) "
+               f"VALUES ({', '.join(['%s'] * len(vals))})")
+        return self._execute(sql, vals)
+
+    def update_row(self, table, form):
+        cols = self._columns(table)
+        editable = [c for c in cols if not c['auto']]
+        sets = ', '.join(f"`{c['name']}` = %s" for c in editable)
+        vals = [self._coerce(c, form.get('col_' + c['name'], '')) for c in editable]
+        where, pk_vals = self._pk_where(cols, form)
+        return self._execute(f'UPDATE `{table}` SET {sets} WHERE {where}', vals + pk_vals)
+
+    def delete_row(self, table, form):
+        cols = self._columns(table)
+        where, pk_vals = self._pk_where(cols, form)
+        return self._execute(f'DELETE FROM `{table}` WHERE {where}', pk_vals)
