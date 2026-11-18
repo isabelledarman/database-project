@@ -22,7 +22,6 @@ db = Database(config)
 app.host = config.APP_HOST
 app.port = config.APP_PORT
 app.debug = config.APP_DEBUG
-app.secret_key = getattr(config, 'SECRET_KEY', 'change-me')  # needed for flash()
 
 
 @app.route('/', methods=['GET'])
@@ -121,7 +120,21 @@ def query5():
     if name and phone:
         rows = db.guest_charges_list(name, phone)
     return render_template('query5.html', rows = rows)
-    
+
+@app.route('/query/6', methods = ['GET'])
+def query6():
+    rows = db.no_show_reservations()
+    return render_template('query6.html', rows = rows)
+
+@app.route('/query/7', methods = ['GET'])
+def query7():
+    rows = db.bonus_list()
+    return render_template('query7.html', rows = rows)
+
+@app.route('/query/8', methods = ['GET'])
+def query8():
+    rows = db.reservation_details()
+    return render_template('query8.html', rows = rows)
 
 if __name__ == '__main__':
     app.run(host=app.host, port=app.port, debug=app.debug)

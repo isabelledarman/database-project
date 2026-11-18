@@ -273,6 +273,65 @@ class Database(object):
         ''',
         (name, phone_number))
 
+    def no_show_reservations(self):
+        return self._query('''
+            SELECT r.reservation_no, r.booking_date, r.status,
+                g.user_id, g.name AS guest_name, g.phone,
+                h.hotel_id, h.name AS hotel_name,
+                rr.room_no, rr.check_in, rr.check_out
+            FROM Reservation r
+            JOIN Guest g ON g.user_id = r.user_id
+            JOIN Reservation_Room rr ON rr.reservation_no = r.reservation_no
+            JOIN Hotel h ON h.hotel_id = rr.hotel_id
+            WHERE r.cancel_date IS NULL AND r.status = 'Confirmed' AND rr.check_in < CURDATE()
+            ORDER BY rr.check_in, r.reservation_no, rr.room_no
+        ''')
+    
+    def bonus_list(self):
+        return self._query('''
+            SELECT g.name, g.phone, b.year, 'Will receive bonus' as status
+            FROM Bonus b
+            JOIN Guest g ON g.user_id = b.user_id
+            ORDER BY b.year, g.name
+        ''')
+
+    def reservation_details(self):
+        return self._query('''
+            SELECT
+                -- reservation
+                r.reservation_no, r.booking_date, r.status, r.cancel_date,
+                -- guest
+                g.user_id, g.name AS guest_name, g.phone AS guest_phone, g.address AS guest_address,
+                -- hotel branch
+                h.hotel_id, h.name AS hotel_name, h.address AS hotel_address, h.city AS hotel_city, h.rating AS hotel_rating,
+                (SELECT GROUP_CONCAT(
+                    CONCAT(a.name, ' (',
+                        IF(ha.charge = 0, 'free', CONCAT('$', ha.charge)),
+                            ')')
+                        ORDER BY a.name SEPARATOR ', ')
+                    FROM Hotel_Amenity ha
+                    JOIN Amenity a ON a.amenity_id = ha.amenity_id
+                WHERE ha.hotel_id = h.hotel_id) AS amenities,
+                (SELECT GROUP_CONCAT(
+                    CONCAT('Room ', cr.conf_room_no,
+                        ' (', cr.capacity, ' seats)')
+                    ORDER BY cr.conf_room_no SEPARATOR ', ')
+                FROM Conference_Room cr
+                WHERE cr.hotel_id = h.hotel_id) AS conference_rooms,
+                -- room and room type
+                rm.room_no, rm.floor, rm.location, rt.bed, rt.smoking, rt.`accessible`,
+                -- stay and cost
+                rr.check_in, rr.check_out, DATEDIFF(rr.check_out, rr.check_in) AS nights,
+                rt.rate AS rate_per_night, DATEDIFF(rr.check_out, rr.check_in) * rt.rate AS room_total
+            FROM Reservation r
+            JOIN Guest g ON g.user_id = r.user_id
+            JOIN Reservation_Room rr ON rr.reservation_no = r.reservation_no
+            JOIN Room rm ON rm.hotel_id = rr.hotel_id AND rm.room_no  = rr.room_no
+            JOIN Room_Type rt ON rt.hotel_id = rm.hotel_id AND rt.bed = rm.bed AND rt.smoking = rm.smoking AND rt.`accessible` = rm.`accessible`
+            JOIN Hotel h ON h.hotel_id = rm.hotel_id
+            ORDER BY r.reservation_no, rr.room_no
+        ''')
+
     # ---------- Generic add / edit / delete for ANY table ----------
     # Column names come from information_schema and table names are checked
     # against TABLES, so only values (never identifiers) come from the user,

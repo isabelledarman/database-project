@@ -105,7 +105,7 @@ CREATE TABLE Reservation(
     user_id INT NOT NULL,
     card_no VARCHAR(19) NOT NULL,
     booking_date DATE NOT NULL,
-    status VARCHAR(20) NOT NULL,            -- fixed: VARCHAR needs a length
+    status VARCHAR(20) NOT NULL,
     cancel_date DATETIME,
 
     PRIMARY KEY(reservation_no),
@@ -126,9 +126,9 @@ CREATE TABLE Reservation_Room(
 );
 
 CREATE TABLE Charge(
-    charge_id INT NOT NULL AUTO_INCREMENT,  -- fixed: PRIMARY KEY referenced a column that did not exist
+    charge_id INT NOT NULL AUTO_INCREMENT,
     reservation_no INT NOT NULL,
-    card_no VARCHAR(19) NOT NULL,           -- fixed: was INT, must match Credit_Card.card_no
+    card_no VARCHAR(19) NOT NULL,
     amount DECIMAL(10, 2) NOT NULL,
     reason VARCHAR(50) NOT NULL,
     charge_type VARCHAR(15) NOT NULL,
@@ -139,14 +139,15 @@ CREATE TABLE Charge(
     FOREIGN KEY (card_no) REFERENCES Credit_Card(card_no)
 );
 
-CREATE TABLE Bonus(
-    user_id INT NOT NULL,
-    year INT NOT NULL,
-    mailed_date DATE NOT NULL,
-
-    PRIMARY KEY(user_id, year),
-    FOREIGN KEY (user_id) REFERENCES Guest(user_id)
-);
+CREATE VIEW Bonus AS
+    SELECT
+        r.user_id,
+        YEAR(r.booking_date) AS year,
+        COUNT(*)             AS reservation_count
+    FROM Reservation r
+    WHERE r.status <> 'Cancelled' AND r.cancel_date IS NULL
+    GROUP BY r.user_id, YEAR(r.booking_date)
+    HAVING COUNT(*) >= 3;
 
 -- ============================================
 -- Sample data (inserted parents-first so foreign keys are satisfied)
@@ -260,7 +261,3 @@ INSERT INTO Charge (reservation_no, card_no, amount, reason, charge_type, charge
     (3, '340000000000009',    50.00, 'Late cancellation fee',         'Fee',     '2026-11-02'),
     (4, '340000000000009',   396.00, 'Room 11, 4 nights',             'Room',    '2026-11-01'),
     (5, '4111111111111111',  645.00, 'Room 102, 5 nights',            'Room',    '2026-11-05');
-
-INSERT INTO Bonus (user_id, year, mailed_date) VALUES
-    (1, 2025, '2026-01-15'),
-    (2, 2025, '2026-01-15');

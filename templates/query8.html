@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reservation confirmation</title>
+</head>
+
+<body>
+
+  <form class="toolbar no-print" method="get" action="{{ url_for('query8') }}">
+    <label for="reservation_no">Reservation</label>
+    <select id="reservation_no" name="reservation_no" onchange="this.form.submit()">
+      <option value="">All reservations</option>
+      {% for n in numbers %}
+      <option value="{{ n }}" {% if selected==n|string %}selected{% endif %}>#{{ n }}</option>
+      {% endfor %}
+    </select>
+    <noscript><button type="submit">Show</button></noscript>
+    <span class="spacer"></span>
+    <button type="button" class="primary" onclick="window.print()">Print</button>
+  </form>
+
+  {% if not rows %}
+  <div class="empty">No reservations found. Choose "All reservations" or add a reservation on the Manage page.</div>
+  {% endif %}
+
+  {% for res_no, items in rows|groupby('reservation_no') %}
+  {% set first = items[0] %}
+  <section class="sheet">
+    <header class="head">
+      <div>
+        <h1>{{ first.hotel_name }}</h1>
+        <div>{{ first.hotel_address }}, {{ first.hotel_city }} &ndash; Rating: {{ first.hotel_rating }} of 5</div>
+      </div>
+      <div class="ref">
+        Reservation <strong>#{{ res_no }}</strong><br>
+        Booked {{ first.booking_date }}<br>
+        <span class="badge {% if first.status == 'Cancelled' %}cancelled{% endif %}">{{ first.status }}</span>
+        {% if first.cancel_date %}<br>Cancelled {{ first.cancel_date }}{% endif %}
+      </div>
+    </header>
+
+    <div class="cols">
+      <div>
+        <h2>Guest</h2>
+        <dl>
+          <dt>Name</dt>
+          <dd>{{ first.guest_name }}</dd>
+          <dt>Phone</dt>
+          <dd>{{ first.guest_phone }}</dd>
+          <dt>Address</dt>
+          <dd>{{ first.guest_address }}</dd>
+          <dt>Guest ID</dt>
+          <dd>{{ first.user_id }}</dd>
+        </dl>
+      </div>
+      <div>
+        <h2>Hotel branch</h2>
+        <dl>
+          <dt>Branch ID</dt>
+          <dd>{{ first.hotel_id }}</dd>
+          <dt>City</dt>
+          <dd>{{ first.hotel_city }}</dd>
+          <dt>Rating</dt>
+          <dd>{{ first.hotel_rating }} of 5</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>Amenities</h2>
+      {{ first.amenities or 'None listed' }}
+    </div>
+    <div class="block">
+      <h2>Conference rooms</h2>
+      {{ first.conference_rooms or 'None' }}
+    </div>
+
+    <h2>Rooms reserved</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Room</th>
+          <th>Floor</th>
+          <th>Location</th>
+          <th>Bed</th>
+          <th>Type</th>
+          <th>Check-in</th>
+          <th>Check-out</th>
+          <th class="num">Nights</th>
+          <th class="num">Rate</th>
+          <th class="num">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td>{{ it.room_no }}</td>
+          <td>{{ it.floor }}</td>
+          <td>{{ it.location }}</td>
+          <td>{{ it.bed }}</td>
+          <td>{{ 'Smoking' if it.smoking else 'Non-smoking' }}, {{ 'Accessible' if it.accessible else 'Standard' }}</td>
+          <td>{{ it.check_in }}</td>
+          <td>{{ it.check_out }}</td>
+          <td class="num">{{ it.nights }}</td>
+          <td class="num">${{ '%.2f'|format(it.rate_per_night) }}</td>
+          <td class="num">${{ '%.2f'|format(it.room_total) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="9">Total room charges</td>
+          <td class="num">${{ '%.2f'|format(items|sum(attribute='room_total')) }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </section>
+  {% endfor %}
+
+</body>
+
+</html>
