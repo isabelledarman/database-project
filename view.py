@@ -13,9 +13,14 @@ import pymysql
 import config
 from logic import Database, TABLES
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()   # reads .env into the environment
 
 # instantiate application and database object
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
 db = Database(config)
 
 # configure the web app according to the config object

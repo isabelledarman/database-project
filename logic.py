@@ -13,7 +13,7 @@ TABLES = [
     'Hotel', 'Amenity', 'Hotel_Amenity', 'Conference_Room',
     'Room_Location', 'Room_Bed', 'Room_Type', 'Room',
     'Guest', 'Credit_Card', 'Reservation', 'Reservation_Room',
-    'Charge', 'Bonus',
+    'Charge',
 ]
 
 
@@ -127,7 +127,7 @@ class Database(object):
             GROUP BY g.user_id, g.name, g.phone, g.address
             ORDER BY g.user_id''')
         bonuses = self._query('''
-            SELECT g.name AS guest_name, b.year, b.mailed_date
+            SELECT g.name AS guest_name, b.year
             FROM Bonus b
             JOIN Guest g ON g.user_id = b.user_id
             ORDER BY b.year, g.name''')

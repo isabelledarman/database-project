@@ -5,16 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Manage Hotel Data</title>
-  <style>
-    .flash { padding: .5em .75em; margin: .5em 0; border: 1px solid; }
-    .flash.ok { background: #e8f5e9; border-color: #66bb6a; }
-    .flash.error { background: #ffebee; border-color: #e57373; }
-    .manage input[type=text], .manage input[type=number], .manage input[type=date],
-    .manage input[type=datetime-local], .manage select { width: 100%; min-width: 6em; box-sizing: border-box; }
-    .manage details { margin: .75em 0; }
-    .manage summary { cursor: pointer; font-weight: bold; }
-    .manage tfoot td { background: #f5f5f5; }
-  </style>
+  <link rel="stylesheet" href="resources/style.css" />
 </head>
 
 <body>
@@ -49,13 +40,12 @@
     </ul>
   </nav>
 
+  <main class="manage">
   {% with messages = get_flashed_messages(with_categories=true) %}
   {% for category, message in messages %}
   <div class="flash {{ category }}" role="alert">{{ message }}</div>
   {% endfor %}
   {% endwith %}
-
-  <main class="manage">
     <p>Open a table to add, edit or delete rows. Leave an optional field empty to store NULL.
       A row that other tables still reference cannot be deleted or have its key changed.</p>
 
@@ -66,7 +56,7 @@
         <table>
           <thead>
             <tr>
-              {% for c in t.columns %}<th>{{ c.name }}{% if c.pk %} 🔑{% endif %}</th>{% endfor %}
+              {% for c in t.columns %}<th>{{ c.name }}{% if c.pk %} (key){% endif %}</th>{% endfor %}
               <th>Actions</th>
             </tr>
           </thead>
