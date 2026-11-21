@@ -32,6 +32,8 @@
   <nav aria-label="Tables">
     <h1>Manage Hotel Data</h1>
     <a href="/">Home</a>
+    <p>Open a table to add, edit or delete rows. Leave an optional field empty to store NULL.
+      A row that other tables still reference cannot be deleted or have its key changed.</p>
     <h2>Tables</h2>
     <ul>
       {% for t in manage %}
@@ -46,9 +48,6 @@
   <div class="flash {{ category }}" role="alert">{{ message }}</div>
   {% endfor %}
   {% endwith %}
-    <p>Open a table to add, edit or delete rows. Leave an optional field empty to store NULL.
-      A row that other tables still reference cannot be deleted or have its key changed.</p>
-
     {% for t in manage %}
     <details id="manage-{{ t.name }}">
       <summary>{{ t.name|replace('_', ' ') }} ({{ t.rows|length }})</summary>

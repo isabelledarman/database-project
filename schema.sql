@@ -151,12 +151,15 @@ CREATE VIEW Bonus AS
 
 -- ============================================
 -- Sample data (inserted parents-first so foreign keys are satisfied)
+-- Designed so that every query in logic.py returns rows.
+-- See the "TEST INPUTS" block at the bottom of this file.
 -- ============================================
 
 INSERT INTO Hotel (hotel_id, name, address, city, rating) VALUES
-    (1, 'Harborview Inn',   '12 Pier Street',    'Baltimore', 4),
-    (2, 'Capitol Suites',   '500 K Street NW',   'Washington', 5),
-    (3, 'Pinecrest Lodge',  '88 Ridge Road',     'Asheville', 3);
+    (1, 'Harborview Inn',   '12 Pier Street',    'Baltimore',      4),
+    (2, 'Capitol Suites',   '500 K Street NW',   'Washington',     5),
+    (3, 'Pinecrest Lodge',  '88 Ridge Road',     'Asheville',      3),
+    (4, 'Seaside Resort',   '300 Boardwalk Ave', 'Virginia Beach', 4);
 
 INSERT INTO Amenity (amenity_id, name) VALUES
     (1, 'WiFi'),
@@ -179,7 +182,12 @@ INSERT INTO Hotel_Amenity (hotel_id, amenity_id, charge) VALUES
     (3, 1,  0.00),
     (3, 2,  9.50),
     (3, 3,  0.00),
-    (3, 4, 15.00);
+    (3, 4, 15.00),
+    (4, 1,  0.00),
+    (4, 2, 18.00),
+    (4, 3, 20.00),
+    (4, 4,  0.00),
+    (4, 5, 70.00);
 
 INSERT INTO Conference_Room (hotel_id, conf_room_no, capacity) VALUES
     (1, 101,  40),
@@ -187,14 +195,17 @@ INSERT INTO Conference_Room (hotel_id, conf_room_no, capacity) VALUES
     (2, 201, 120),
     (2, 202,  50),
     (2, 203,  20),
-    (3,   1,  30);
+    (3,   1,  30),
+    (4,  10,  80),
+    (4,  11,  25);
 
 INSERT INTO Room_Location (location) VALUES
     ('Harbor View'),
     ('City View'),
     ('Courtyard'),
     ('Pool Side'),
-    ('Mountain View');
+    ('Mountain View'),
+    ('Ocean View');
 
 INSERT INTO Room_Bed (bed) VALUES
     ('Single'),
@@ -206,58 +217,103 @@ INSERT INTO Room_Type (hotel_id, bed, smoking, `accessible`, rate) VALUES
     (1, 'Queen',  FALSE, FALSE, 129.00),
     (1, 'King',   FALSE, TRUE,  159.00),
     (1, 'Double', TRUE,  FALSE, 109.00),
+    (1, 'Single', FALSE, FALSE,  89.00),
     (2, 'King',   FALSE, FALSE, 249.00),
     (2, 'Queen',  FALSE, TRUE,  229.00),
     (2, 'Single', FALSE, FALSE, 179.00),
     (3, 'Double', FALSE, FALSE,  99.00),
     (3, 'Queen',  TRUE,  FALSE,  89.00),
-    (3, 'King',   FALSE, TRUE,  119.00);
+    (3, 'King',   FALSE, TRUE,  119.00),
+    (4, 'King',   FALSE, FALSE, 199.00),
+    (4, 'Queen',  FALSE, TRUE,  179.00),
+    (4, 'Double', FALSE, FALSE, 139.00),
+    (4, 'Queen',  TRUE,  FALSE, 149.00);
 
 INSERT INTO Room (hotel_id, room_no, floor, location, bed, smoking, `accessible`) VALUES
     (1,  101,  1, 'Courtyard',     'King',   FALSE, TRUE),
     (1,  102,  1, 'Courtyard',     'Queen',  FALSE, FALSE),
     (1,  201,  2, 'Harbor View',   'Queen',  FALSE, FALSE),
     (1,  202,  2, 'Harbor View',   'Double', TRUE,  FALSE),
+    (1,  203,  2, 'Harbor View',   'Single', FALSE, FALSE),
     (2,  301,  3, 'City View',     'King',   FALSE, FALSE),
     (2,  302,  3, 'City View',     'Queen',  FALSE, TRUE),
     (2, 1001, 10, 'City View',     'Single', FALSE, FALSE),
     (2, 1002, 10, 'City View',     'King',   FALSE, FALSE),
+    (2, 1003, 10, 'City View',     'Queen',  FALSE, TRUE),
     (3,   11,  1, 'Mountain View', 'Double', FALSE, FALSE),
     (3,   12,  1, 'Pool Side',     'Queen',  TRUE,  FALSE),
-    (3,   21,  2, 'Mountain View', 'King',   FALSE, TRUE);
+    (3,   21,  2, 'Mountain View', 'King',   FALSE, TRUE),
+    (4,  110,  1, 'Ocean View',    'King',   FALSE, FALSE),
+    (4,  120,  1, 'Ocean View',    'Queen',  FALSE, TRUE),
+    (4,  210,  2, 'Ocean View',    'Double', FALSE, FALSE),
+    (4,  220,  2, 'Pool Side',     'Queen',  TRUE,  FALSE);
 
 INSERT INTO Guest (user_id, phone, name, address) VALUES
     (1, '4105550101', 'Maya Ortiz',  '14 Elm St, Baltimore, MD'),
     (2, '2025550142', 'Daniel Kim',  '901 Pennsylvania Ave, Washington, DC'),
     (3, '8285550177', 'Priya Nair',  '7 Laurel Ln, Asheville, NC'),
-    (4, '3015550119', 'Tom Becker',  '220 Oak Dr, Rockville, MD');
+    (4, '3015550119', 'Tom Becker',  '220 Oak Dr, Rockville, MD'),
+    (5, '7575550133', 'Lena Park',   '45 Bay Ct, Norfolk, VA'),
+    (6, '9195550188', 'Sam Rivera',  '310 Oakwood Ave, Raleigh, NC');
 
 INSERT INTO Credit_Card (card_no, exp_date, holder_name) VALUES
     ('4111111111111111', '2028-09-30', 'Maya Ortiz'),
     ('5500000000000004', '2027-04-30', 'Daniel Kim'),
     ('340000000000009',  '2029-01-31', 'Priya Nair'),
-    ('6011000000000004', '2026-12-31', 'Tom Becker');
+    ('6011000000000004', '2026-12-31', 'Tom Becker'),
+    ('378282246310005',  '2029-06-30', 'Lena Park'),
+    ('3530111333300000', '2028-03-31', 'Sam Rivera');
 
+-- Reservation notes:
+--   Maya (1): 3 non-cancelled bookings in 2026 (#1, #5, #6)  -> Bonus 2026
+--   Daniel (2): 3 non-cancelled bookings in 2025 (#10-#12)   -> Bonus 2025
+--   #3 and #9 are cancelled (cancelled rows are ignored by availability + Bonus)
+--   #7 and #8 are 'Confirmed' with a check-in date already in the past -> no-shows
+--   #2, #4, #5 are Confirmed with future check-in -> NOT no-shows
 INSERT INTO Reservation (reservation_no, user_id, card_no, booking_date, status, cancel_date) VALUES
-    (1, 1, '4111111111111111', '2026-09-01', 'Completed', NULL),
-    (2, 2, '5500000000000004', '2026-10-10', 'Confirmed', NULL),
-    (3, 3, '340000000000009',  '2026-10-20', 'Cancelled', '2026-11-02 14:35:00'),
-    (4, 3, '340000000000009',  '2026-11-01', 'Confirmed', NULL),
-    (5, 1, '4111111111111111', '2026-11-05', 'Confirmed', NULL);
+    ( 1, 1, '4111111111111111', '2026-09-01', 'Completed', NULL),
+    ( 2, 2, '5500000000000004', '2026-10-10', 'Confirmed', NULL),
+    ( 3, 3, '340000000000009',  '2026-10-20', 'Cancelled', '2026-11-02 14:35:00'),
+    ( 4, 3, '340000000000009',  '2026-11-01', 'Confirmed', NULL),
+    ( 5, 1, '4111111111111111', '2026-11-05', 'Confirmed', NULL),
+    ( 6, 1, '4111111111111111', '2026-06-15', 'Completed', NULL),
+    ( 7, 4, '6011000000000004', '2026-09-25', 'Confirmed', NULL),
+    ( 8, 5, '378282246310005',  '2026-10-01', 'Confirmed', NULL),
+    ( 9, 6, '3530111333300000', '2026-10-15', 'Cancelled', '2026-10-30 09:10:00'),
+    (10, 2, '5500000000000004', '2025-02-10', 'Completed', NULL),
+    (11, 2, '5500000000000004', '2025-06-05', 'Completed', NULL),
+    (12, 2, '5500000000000004', '2025-11-20', 'Completed', NULL);
 
 INSERT INTO Reservation_Room (reservation_no, hotel_id, room_no, check_in, check_out) VALUES
-    (1, 1, 201, '2026-09-12', '2026-09-15'),
-    (2, 2, 301, '2026-12-20', '2026-12-23'),
-    (2, 2, 302, '2026-12-20', '2026-12-23'),
-    (3, 3,  21, '2026-11-20', '2026-11-22'),
-    (4, 3,  11, '2026-12-01', '2026-12-05'),
-    (5, 1, 102, '2026-12-28', '2027-01-02');
+    ( 1, 1,  201, '2026-09-12', '2026-09-15'),
+    ( 2, 2,  301, '2026-12-20', '2026-12-23'),
+    ( 2, 2,  302, '2026-12-20', '2026-12-23'),
+    ( 3, 3,   21, '2026-11-20', '2026-11-22'),
+    ( 4, 3,   11, '2026-12-01', '2026-12-05'),
+    ( 5, 1,  102, '2026-12-28', '2027-01-02'),
+    ( 6, 4,  110, '2026-07-04', '2026-07-07'),
+    ( 7, 1,  202, '2026-10-05', '2026-10-08'),
+    ( 8, 4,  120, '2026-10-18', '2026-10-20'),
+    ( 8, 4,  210, '2026-10-18', '2026-10-20'),
+    ( 9, 2, 1001, '2026-11-25', '2026-11-28'),
+    (10, 2, 1002, '2025-03-01', '2025-03-03'),
+    (11, 3,   21, '2025-06-20', '2025-06-22'),
+    (12, 1,  101, '2025-12-05', '2025-12-07');
 
 -- charge_id is AUTO_INCREMENT, so it is left out of the column list
 INSERT INTO Charge (reservation_no, card_no, amount, reason, charge_type, charge_date) VALUES
-    (1, '4111111111111111',  387.00, 'Room 201, 3 nights',            'Room',    '2026-09-15'),
-    (1, '4111111111111111',   37.50, 'Breakfast x3',                  'Amenity', '2026-09-15'),
-    (2, '5500000000000004', 1434.00, 'Rooms 301 and 302, 3 nights',   'Room',    '2026-10-10'),
-    (3, '340000000000009',    50.00, 'Late cancellation fee',         'Fee',     '2026-11-02'),
-    (4, '340000000000009',   396.00, 'Room 11, 4 nights',             'Room',    '2026-11-01'),
-    (5, '4111111111111111',  645.00, 'Room 102, 5 nights',            'Room',    '2026-11-05');
+    ( 1, '4111111111111111',  387.00, 'Room 201, 3 nights',            'Room',    '2026-09-15'),
+    ( 1, '4111111111111111',   37.50, 'Breakfast x3',                  'Amenity', '2026-09-15'),
+    ( 2, '5500000000000004', 1434.00, 'Rooms 301 and 302, 3 nights',   'Room',    '2026-10-10'),
+    ( 3, '340000000000009',    50.00, 'Late cancellation fee',         'Fee',     '2026-11-02'),
+    ( 4, '340000000000009',   396.00, 'Room 11, 4 nights',             'Room',    '2026-11-01'),
+    ( 5, '4111111111111111',  645.00, 'Room 102, 5 nights',            'Room',    '2026-11-05'),
+    ( 6, '4111111111111111',  597.00, 'Room 110, 3 nights',            'Room',    '2026-07-07'),
+    ( 6, '4111111111111111',   60.00, 'Parking x3',                    'Amenity', '2026-07-07'),
+    ( 7, '6011000000000004',  327.00, 'Room 202, 3 nights',            'Room',    '2026-09-25'),
+    ( 8, '378282246310005',   636.00, 'Rooms 120 and 210, 2 nights',   'Room',    '2026-10-01'),
+    ( 9, '3530111333300000',   50.00, 'Late cancellation fee',         'Fee',     '2026-10-30'),
+    (10, '5500000000000004',  498.00, 'Room 1002, 2 nights',           'Room',    '2025-03-03'),
+    (11, '5500000000000004',  238.00, 'Room 21, 2 nights',             'Room',    '2025-06-22'),
+    (12, '5500000000000004',  318.00, 'Room 101, 2 nights',            'Room',    '2025-12-07'),
+    (12, '5500000000000004',   25.00, 'Breakfast x2',                  'Amenity', '2025-12-07');
