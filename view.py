@@ -1,6 +1,6 @@
 """Web front-end for the Hotel database (Flask).
 
-Run with:  python view.py   then open http://127.0.0.1:5001/
+Run with:  python3 view.py   then open http://127.0.0.1:5001/
 (For the version without a web interface, run main.py instead.)
 """
 

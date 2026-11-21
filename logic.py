@@ -191,7 +191,7 @@ class Database(object):
 
         print(f"\n{line}\nBONUS MAILINGS\n{line}")
         for b in data['bonuses']:
-            print(f"  {b['year']}  {b['guest_name']:<14} mailed {b['mailed_date']}")
+            print(f"  {b['year']}  {b['guest_name']:<14}")
 
         print(f"\n{line}\nROW COUNTS\n{line}")
         for table, n in data['counts'].items():
@@ -201,11 +201,11 @@ class Database(object):
         return self._query('SELECT DISTINCT city FROM Hotel ORDER BY city')
 
     def get_beds(self):
-            return self._query('SELECT bed FROM Room_bed ORDER BY bed')
+            return self._query('SELECT bed FROM Room_Bed ORDER BY bed')
 
     def available_rooms(self, city, bed, smoking, check_in, check_out):
         return self._query('''
-            SELECT h.name as hotel, r.room_no AS room, r.floor, r.location, r.bed, IF(r.accessible, 'Yes', 'No') AS acessible, rt.rate
+            SELECT h.name as hotel, r.room_no AS room, r.floor, r.location, r.bed, r.accessible, rt.rate
             FROM Room r
             JOIN Hotel h ON h.hotel_id = r.hotel_id
             JOIN Room_Type rt ON rt.hotel_id = r.hotel_id AND rt.bed = r.bed AND rt.smoking = r.smoking AND rt.accessible = r.accessible
