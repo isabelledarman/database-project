@@ -31,12 +31,7 @@ app.debug = config.APP_DEBUG
 
 @app.route('/', methods=['GET'])
 def index():
-    """Display everything in the database, organized by hotel, reservation, guest and bonus"""
     return render_template('index.html')
-
-@app.route('/all', methods=['GET'])
-def show_all():
-    return render_template('all.html', data=db.get_all_data())
 
 @app.route('/manage', methods=['GET'])
 def manage():
@@ -139,7 +134,8 @@ def query7():
 @app.route('/query/8', methods = ['GET'])
 def query8():
     rows = db.reservation_details()
-    return render_template('query8.html', rows = rows)
+    numbers = [r["reservation_no"] for r in rows]
+    return render_template('query8.html', rows = rows, numbers = numbers)
 
 if __name__ == '__main__':
     app.run(host=app.host, port=app.port, debug=app.debug)

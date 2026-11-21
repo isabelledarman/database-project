@@ -1,10 +1,30 @@
-<h2>Reservations by Person</h2>
-<form method="get">
-  Name:
-  <input type ="text" name = "name" placeholder="enter name">
-  Phone:
-  <input type ="text" name = "phone" placeholder="enter phone">
-</form>
+<!DOCTYPE html>
+<html lang="en">
 
-{% if rows is not none %}{% include '_results.html' %}{% endif %}
-<p><a href="/">Back</a></p>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reservation by Guest</title>
+  <link rel="stylesheet" href="/resources/style.css" />
+</head>
+
+<body>
+  <nav aria-label="Sections">
+    <h1>Query 4</h1>
+    <p>
+      Given a person’s name and phone number, show all reservations of that person in all branches of MyHotel hotel in the database.
+    </p>
+    <p><a href="/">Back</a></p>
+  </nav>
+
+  <main>
+    <form method="get">
+      Name:
+      <input type="text" name="name" placeholder="enter name">
+      Phone:
+      <input type="text" name="phone" placeholder="enter phone">
+    </form>
+
+    {% if rows is not none %}{% include '_results.html' %}{% endif %}
+  </main>
+</body>

@@ -1,22 +1,42 @@
-<h2>Available rooms</h2>
-<form method="get">
-  City:
-  <select name="city">
-    {% for c in cities %}<option>{{ c.city }}</option>{% endfor %}
-  </select>
-  Bed:
-  <select name="bed">
-    {% for b in beds %}<option>{{ b.bed }}</option>{% endfor %}
-  </select>
-  Smoking:
-  <select name="smoking">
-    <option value="0">Non-smoking</option>
-    <option value="1">Smoking</option>
-  </select>
-  Check-in: <input type="date" name="check_in" required>
-  Check-out: <input type="date" name="check_out" required>
-  <button>Search</button>
-</form>
+<!DOCTYPE html>
+<html lang="en">
 
-{% if rows is not none %}{% include '_results.html' %}{% endif %}
-<p><a href="/">Back</a></p>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Available Rooms</title>
+  <link rel="stylesheet" href="/resources/style.css" />
+</head>
+
+<body>
+  <nav aria-label="Sections">
+    <h1>Query 1</h1>
+    <p>
+      Given a city and requested bed size and smoking status by the user, show the list of the available rooms for each hotel of that city.
+    </p>
+    <p><a href="/">Back</a></p>
+  </nav>
+
+  <main>
+    <form method="get">
+      City:
+      <select name="city">
+        {% for c in cities %}<option>{{ c.city }}</option>{% endfor %}
+      </select>
+      Bed:
+      <select name="bed">
+        {% for b in beds %}<option>{{ b.bed }}</option>{% endfor %}
+      </select>
+      Smoking:
+      <select name="smoking">
+        <option value="0">Non-smoking</option>
+        <option value="1">Smoking</option>
+      </select>
+      Check-in: <input type="date" name="check_in" required>
+      Check-out: <input type="date" name="check_out" required>
+      <button>Search</button>
+    </form>
+
+    {% if rows is not none %}{% include '_results.html' %}{% endif %}
+  </main>
+</body>

@@ -1,11 +1,31 @@
-<h2>Hotels Near Mountains or Oceans</h2>
-<form method="get">
-  City:
-  <select name="city">
-    {% for c in cities %}<option>{{ c.city }}</option>{% endfor %}
-  </select>
-  <button>Search</button>
-</form>
+<!DOCTYPE html>
+<html lang="en">
 
-{% if rows is not none %}{% include '_results.html' %}{% endif %}
-<p><a href="/">Back</a></p>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hotels Near Mountains or Oceans</title>
+  <link rel="stylesheet" href="/resources/style.css" />
+</head>
+
+<body>
+  <nav aria-label="Sections">
+    <h1>Query 3</h1>
+    <p>
+      In which of the cities are hotels located next to a mountain or next to an ocean? List the name and address of those hotels.
+    </p>
+    <p><a href="/">Back</a></p>
+  </nav>
+
+  <main>
+    <form method="get">
+      City:
+      <select name="city">
+        {% for c in cities %}<option>{{ c.city }}</option>{% endfor %}
+      </select>
+      <button>Search</button>
+    </form>
+
+    {% if rows is not none %}{% include '_results.html' %}{% endif %}
+  </main>
+</body>
