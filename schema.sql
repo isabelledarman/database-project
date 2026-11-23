@@ -18,7 +18,22 @@ CREATE TABLE Hotel(
     address VARCHAR(30) NOT NULL,
     city VARCHAR(30) NOT NULL,
     rating INT NOT NULL,
-    PRIMARY KEY(hotel_id)
+    PRIMARY KEY(hotel_id),
+    CHECK (rating BETWEEN 1 AND 6)
+);
+
+CREATE TABLE Area(
+    area VARCHAR(20) NOT NULL,
+    PRIMARY KEY(area)
+);
+
+CREATE TABLE Hotel_Area(
+    hotel_id INT NOT NULL,
+    area VARCHAR(20) NOT NULL,
+
+    PRIMARY KEY(hotel_id, area),
+    FOREIGN KEY (hotel_id) REFERENCES Hotel(hotel_id),
+    FOREIGN KEY (area) REFERENCES Area(area)
 );
 
 CREATE TABLE Amenity(
@@ -101,7 +116,7 @@ CREATE TABLE Credit_Card(
 );
 
 CREATE TABLE Reservation(
-    reservation_no INT NOT NULL,
+    reservation_no INT NOT NULL AUTO_INCREMENT, 
     user_id INT NOT NULL,
     card_no VARCHAR(19) NOT NULL,
     booking_date DATE NOT NULL,
@@ -200,12 +215,32 @@ INSERT INTO Conference_Room (hotel_id, conf_room_no, capacity) VALUES
     (4,  11,  25);
 
 INSERT INTO Room_Location (location) VALUES
-    ('Harbor View'),
-    ('City View'),
-    ('Courtyard'),
-    ('Pool Side'),
-    ('Mountain View'),
-    ('Ocean View');
+    ('North'), 
+    ('South'), 
+    ('East'), 
+    ('West'),
+    ('North-East'), 
+    ('North-West'), 
+    ('South-East'), 
+    ('South-West');
+
+INSERT INTO Area (area) VALUES
+    ('Ocean'), (
+    'Mountain'), 
+    ('Lake'), 
+    ('River'), 
+    ('Bay'), 
+    ('Downtown');
+
+INSERT INTO Hotel_Area (hotel_id, area) VALUES
+    (1, 'Bay'),
+    (1, 'Downtown'),
+    (2, 'River'),
+    (2, 'Downtown'),
+    (3, 'Mountain'),
+    (3, 'Lake'),
+    (4, 'Ocean');
+
 
 INSERT INTO Room_Bed (bed) VALUES
     ('Single'),
@@ -230,23 +265,23 @@ INSERT INTO Room_Type (hotel_id, bed, smoking, `accessible`, rate) VALUES
     (4, 'Queen',  TRUE,  FALSE, 149.00);
 
 INSERT INTO Room (hotel_id, room_no, floor, location, bed, smoking, `accessible`) VALUES
-    (1,  101,  1, 'Courtyard',     'King',   FALSE, TRUE),
-    (1,  102,  1, 'Courtyard',     'Queen',  FALSE, FALSE),
-    (1,  201,  2, 'Harbor View',   'Queen',  FALSE, FALSE),
-    (1,  202,  2, 'Harbor View',   'Double', TRUE,  FALSE),
-    (1,  203,  2, 'Harbor View',   'Single', FALSE, FALSE),
-    (2,  301,  3, 'City View',     'King',   FALSE, FALSE),
-    (2,  302,  3, 'City View',     'Queen',  FALSE, TRUE),
-    (2, 1001, 10, 'City View',     'Single', FALSE, FALSE),
-    (2, 1002, 10, 'City View',     'King',   FALSE, FALSE),
-    (2, 1003, 10, 'City View',     'Queen',  FALSE, TRUE),
-    (3,   11,  1, 'Mountain View', 'Double', FALSE, FALSE),
-    (3,   12,  1, 'Pool Side',     'Queen',  TRUE,  FALSE),
-    (3,   21,  2, 'Mountain View', 'King',   FALSE, TRUE),
-    (4,  110,  1, 'Ocean View',    'King',   FALSE, FALSE),
-    (4,  120,  1, 'Ocean View',    'Queen',  FALSE, TRUE),
-    (4,  210,  2, 'Ocean View',    'Double', FALSE, FALSE),
-    (4,  220,  2, 'Pool Side',     'Queen',  TRUE,  FALSE);
+    (1,  101,  1, 'North',     'King',   FALSE, TRUE),
+    (1,  102,  1, 'North',     'Queen',  FALSE, FALSE),
+    (1,  201,  2, 'East',   'Queen',  FALSE, FALSE),
+    (1,  202,  2, 'East',   'Double', TRUE,  FALSE),
+    (1,  203,  2, 'South',   'Single', FALSE, FALSE),
+    (2,  301,  3, 'North-East',     'King',   FALSE, FALSE),
+    (2,  302,  3, 'North-West',     'Queen',  FALSE, TRUE),
+    (2, 1001, 10, 'South',     'Single', FALSE, FALSE),
+    (2, 1002, 10, 'South-East',     'King',   FALSE, FALSE),
+    (2, 1003, 10, 'South-West',     'Queen',  FALSE, TRUE),
+    (3,   11,  1, 'West', 'Double', FALSE, FALSE),
+    (3,   12,  1, 'South',     'Queen',  TRUE,  FALSE),
+    (3,   21,  2, 'West', 'King',   FALSE, TRUE),
+    (4,  110,  1, 'East',    'King',   FALSE, FALSE),
+    (4,  120,  1, 'East',    'Queen',  FALSE, TRUE),
+    (4,  210,  2, 'East',    'Double', FALSE, FALSE),
+    (4,  220,  2, 'West',     'Queen',  TRUE,  FALSE);
 
 INSERT INTO Guest (user_id, phone, name, address) VALUES
     (1, '4105550101', 'Maya Ortiz',  '14 Elm St, Baltimore, MD'),
@@ -273,7 +308,7 @@ INSERT INTO Credit_Card (card_no, exp_date, holder_name) VALUES
 INSERT INTO Reservation (reservation_no, user_id, card_no, booking_date, status, cancel_date) VALUES
     ( 1, 1, '4111111111111111', '2026-09-01', 'Completed', NULL),
     ( 2, 2, '5500000000000004', '2026-10-10', 'Confirmed', NULL),
-    ( 3, 3, '340000000000009',  '2026-10-20', 'Cancelled', '2026-11-02 14:35:00'),
+    ( 3, 3, '340000000000009',  '2026-10-20', 'Cancelled', '2026-11-19 10:00:00'),    
     ( 4, 3, '340000000000009',  '2026-11-01', 'Confirmed', NULL),
     ( 5, 1, '4111111111111111', '2026-11-05', 'Confirmed', NULL),
     ( 6, 1, '4111111111111111', '2026-06-15', 'Completed', NULL),
@@ -305,14 +340,13 @@ INSERT INTO Charge (reservation_no, card_no, amount, reason, charge_type, charge
     ( 1, '4111111111111111',  387.00, 'Room 201, 3 nights',            'Room',    '2026-09-15'),
     ( 1, '4111111111111111',   37.50, 'Breakfast x3',                  'Amenity', '2026-09-15'),
     ( 2, '5500000000000004', 1434.00, 'Rooms 301 and 302, 3 nights',   'Room',    '2026-10-10'),
-    ( 3, '340000000000009',    50.00, 'Late cancellation fee',         'Fee',     '2026-11-02'),
+    ( 3, '340000000000009', 23.80, 'Late cancellation: 20% of first night', 'Fee', '2026-11-19'),    
     ( 4, '340000000000009',   396.00, 'Room 11, 4 nights',             'Room',    '2026-11-01'),
     ( 5, '4111111111111111',  645.00, 'Room 102, 5 nights',            'Room',    '2026-11-05'),
     ( 6, '4111111111111111',  597.00, 'Room 110, 3 nights',            'Room',    '2026-07-07'),
     ( 6, '4111111111111111',   60.00, 'Parking x3',                    'Amenity', '2026-07-07'),
     ( 7, '6011000000000004',  327.00, 'Room 202, 3 nights',            'Room',    '2026-09-25'),
     ( 8, '378282246310005',   636.00, 'Rooms 120 and 210, 2 nights',   'Room',    '2026-10-01'),
-    ( 9, '3530111333300000',   50.00, 'Late cancellation fee',         'Fee',     '2026-10-30'),
     (10, '5500000000000004',  498.00, 'Room 1002, 2 nights',           'Room',    '2025-03-03'),
     (11, '5500000000000004',  238.00, 'Room 21, 2 nights',             'Room',    '2025-06-22'),
     (12, '5500000000000004',  318.00, 'Room 101, 2 nights',            'Room',    '2025-12-07'),

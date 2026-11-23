@@ -80,7 +80,8 @@
           <dl>
             <dt>Branch ID: {{ first.hotel_id }}</dt>
             <dt>City: {{ first.hotel_city }}</dt>
-            <dt>Rating: <span class="rating" role="img" aria-label="{{ first.hotel_rating }} out of 5 stars">{{ '★' * first.hotel_rating }}{{ '☆' * (5 - first.hotel_rating) }}</span></dt>
+            <dt>Next to: {{first.hotel_areas or '-'}}</dt>
+            <dt>Rating: <span class="rating" role="img" aria-label="{{ first.hotel_rating }} out of 6 stars">{{ '★' * first.hotel_rating }}{{ '☆' * (6 - first.hotel_rating) }}</span></dt>
           </dl>
         </div>
       </div>

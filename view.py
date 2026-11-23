@@ -44,7 +44,8 @@ def _edit(table, action, success):
         abort(404)
     try:
         action(table, request.form)
-        flash(success, 'ok')
+        if success:
+            flash(success, 'ok')
     except ValueError as e:
         flash(f'{table}: {e}', 'error')
     except pymysql.MySQLError as e:
@@ -53,7 +54,16 @@ def _edit(table, action, success):
 
 @app.route('/table/<table>/insert', methods=['POST'])
 def table_insert(table):
+    if table == 'Reservation':
+        return _edit(table, _add_reservation, None)
     return _edit(table, db.insert_row, f'Added a row to {table}.')
+
+def _add_reservation(table, form):
+    reservation_no = db.insert_row(table, form)
+    flash(f'Reservation #{reservation_no} created.', 'ok')
+    name = db.bonus_for_reservation(reservation_no)
+    if name:
+        flash(f'{name} - Will Receive Bonus', 'ok')
 
 @app.route('/table/<table>/update', methods=['POST'])
 def table_update(table):
@@ -97,9 +107,7 @@ def query2():
 @app.route('/query/3', methods = ['GET'])
 def query3():
     city = request.args.get('city','')
-    rows = None
-    if city:
-        rows = db.mountain_or_ocean(city)
+    rows = db.mountain_or_ocean(city)
     return render_template('query3.html', rows = rows, cities = db.get_cities())
     
 
@@ -125,6 +133,15 @@ def query5():
 def query6():
     rows = db.no_show_reservations()
     return render_template('query6.html', rows = rows)
+
+@app.route('/query/6/charge', methods = ['POST'])
+def query6_charge():
+    try:
+        n = db.charge_no_show_fees()
+        flash(f'Charged no show fee to {n} reservation(s)', 'ok')
+    except pymysql.MySQLError as e:
+        flash(str(e.args[1]) if len(e.args) > 1 else str(e), 'error')
+    return redirect(url_for('query6'))
 
 @app.route('/query/7', methods = ['GET'])
 def query7():

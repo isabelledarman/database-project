@@ -21,6 +21,7 @@
     <form method="get">
       City:
       <select name="city">
+        <option value="">All cities</option>
         {% for c in cities %}<option>{{ c.city }}</option>{% endfor %}
       </select>
       <button>Search</button>

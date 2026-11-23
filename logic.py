@@ -10,7 +10,7 @@ import pymysql
 
 # Every table in the schema, parents first (matches the order in schema.sql)
 TABLES = [
-    'Hotel', 'Amenity', 'Hotel_Amenity', 'Conference_Room',
+    'Hotel', 'Area', 'Hotel_Area', 'Amenity', 'Hotel_Amenity', 'Conference_Room',
     'Room_Location', 'Room_Bed', 'Room_Type', 'Room',
     'Guest', 'Credit_Card', 'Reservation', 'Reservation_Room',
     'Charge',
@@ -237,16 +237,17 @@ class Database(object):
         ''',
         (city, check_out, check_in))
 
-    def mountain_or_ocean(self, city):
+    def mountain_or_ocean(self, city=None):
         return self._query('''
-            SELECT DISTINCT h.city, h.name AS name, h.address
+            SELECT DISTINCT h.city, h.name AS name, h.address, GROUP_CONCAT(ha.area ORDER BY ha.area SEPARATOR ', ') AS next_to
             FROM Hotel h
-            JOIN Room r on r.hotel_id = h.hotel_id
-            WHERE h.city = %s
-                AND (r.location LIKE '%%Mountain%%' OR r.location LIKE '%%Ocean%%')
+            JOIN Hotel_Area ha ON ha.hotel_id = h.hotel_id
+            WHERE ha.area IN ('Mountain', 'Ocean')
+                AND (%s IS NULL OR h.city = %s)
+            GROUP BY h.hotel_id, h.city, h.name, h.address
             ORDER BY h.city, h.name
         ''',
-        (city,))
+        (city or None, city or None))
 
     def reservations_by_person(self, name, phone_number):
         return self._query('''
@@ -283,13 +284,36 @@ class Database(object):
             JOIN Guest g ON g.user_id = r.user_id
             JOIN Reservation_Room rr ON rr.reservation_no = r.reservation_no
             JOIN Hotel h ON h.hotel_id = rr.hotel_id
-            WHERE r.cancel_date IS NULL AND r.status = 'Confirmed' AND rr.check_in < CURDATE()
+            WHERE r.cancel_date IS NULL AND r.status = 'Confirmed' AND TIMESTAMP(rr.check_in, '15:00:00') < NOW()
             ORDER BY rr.check_in, r.reservation_no, rr.room_no
         ''')
+
+    def charge_no_show_fees(self):
+        return self._execute('''
+            INSERT INTO Charge (reservation_no, card_no, amount, reason, charge_type, charge_date)
+            SELECT r.reservation_no, r.card_no, ROUND(SUM(0.20*rt.rate), 2), 'No-show: 20%% of first night', 'Fee', CURDATE()
+            FROM Reservation r
+            JOIN Reservation_Room rr on rr.reservation_no = r.reservation_no
+            JOIN Room rm on rm.hotel_id = rr.hotel_id AND rm.room_no = rr.room_no
+            JOIN Room_Type rt on rt.hotel_id = rm.hotel_id AND rt.bed = rm.bed AND rt.smoking = rm.smoking AND rt.`accessible` = rm.`accessible`
+            WHERE r.cancel_date IS NULL and r.status = 'Confirmed' AND NOT EXISTS (SELECT 1 FROM Charge c where c.reservation_no = r.reservation_no and c.charge_type = 'Fee')
+            GROUP BY r.reservation_no, r.card_no
+            HAVING TIMESTAMP(MIN(rr.check_in), '15:00:00') < NOW()
+        ''')
+
+    def bonus_for_reservation(self, reservation_no):
+        rows = self._query('''
+            SELECT g.name
+            FROM Reservation r
+            JOIN Bonus b on b.user_id = r.user_id AND b.year = YEAR(r.booking_date)
+            JOIN Guest g on g.user_id = r.user_id
+            WHERE r.reservation_no = %s
+        ''', (reservation_no,))
+        return rows[0]['name'] if rows else None
     
     def bonus_list(self):
         return self._query('''
-            SELECT g.name, g.phone, b.year, 'Will receive bonus' as status
+            SELECT g.name, g.phone, b.year, 'Will Receive Bonus' as status
             FROM Bonus b
             JOIN Guest g ON g.user_id = b.user_id
             ORDER BY b.year, g.name
@@ -304,6 +328,9 @@ class Database(object):
                 g.user_id, g.name AS guest_name, g.phone AS guest_phone, g.address AS guest_address,
                 -- hotel branch
                 h.hotel_id, h.name AS hotel_name, h.address AS hotel_address, h.city AS hotel_city, h.rating AS hotel_rating,
+                (SELECT GROUP_CONCAT(ha.area ORDER BY ha.area SEPARATOR ', ')
+                    FROM Hotel_Area ha
+                WHERE ha.hotel_id = h.hotel_id) AS hotel_areas,
                 (SELECT GROUP_CONCAT(
                     CONCAT(a.name, ' (',
                         IF(ha.charge = 0, 'free', CONCAT('$', ha.charge)),
@@ -331,7 +358,7 @@ class Database(object):
             JOIN Hotel h ON h.hotel_id = rm.hotel_id
             ORDER BY r.reservation_no, rr.room_no
         ''')
-
+    
     # ---------- Generic add / edit / delete for ANY table ----------
     # Column names come from information_schema and table names are checked
     # against TABLES, so only values (never identifiers) come from the user,
@@ -391,7 +418,6 @@ class Database(object):
 
     @staticmethod
     def _coerce(col, raw):
-        """Turn a submitted form string into a value for the DB ('' becomes NULL if allowed)."""
         raw = (raw or '').strip()
         if raw == '':
             if col['nullable'] or col['auto']:
@@ -401,11 +427,11 @@ class Database(object):
             raw = raw.replace('T', ' ')
         return raw
 
-    def _execute(self, sql, params=()):
+    def _execute(self, sql, params=(), return_id=False):
         cur = self.conn.cursor()
         try:
             cur.execute(sql, params)
-            return cur.rowcount
+            return cur.lastrowid if return_id else cur.rowcount
         finally:
             cur.close()
 
@@ -416,7 +442,6 @@ class Database(object):
         return where, [form.get('pk_' + c['name'], '') for c in pk]
 
     def get_manage_data(self):
-        """Every table with its column info and rows, ready for the edit forms."""
         tables = []
         for table in TABLES:
             cols = self._columns(table)
@@ -429,28 +454,98 @@ class Database(object):
             })
         return tables
 
+    def _check_room_free(self, form):
+        check_in = form.get('col_check_in', '').strip()
+        check_out = form.get('col_check_out', '').strip()
+        if check_in and check_out and check_out <= check_in:   # ISO dates compare correctly as text
+            raise ValueError('Check-out must be after check-in.')
+        clash = self._query('''
+            SELECT rr.reservation_no
+            FROM Reservation_Room rr
+            JOIN Reservation res ON res.reservation_no = rr.reservation_no
+            WHERE rr.hotel_id = %s AND rr.room_no = %s
+                AND res.status <> 'Cancelled'
+                AND rr.check_in < %s AND rr.check_out > %s
+                -- skip the row being edited (<=> is equals that also works with NULL)
+                AND NOT (rr.reservation_no <=> %s AND rr.hotel_id <=> %s AND rr.room_no <=> %s)
+        ''', (form.get('col_hotel_id'), form.get('col_room_no'), check_out, check_in,
+              form.get('pk_reservation_no'), form.get('pk_hotel_id'), form.get('pk_room_no')))
+        if clash:
+            raise ValueError(f"That room is already booked for some of those nights "
+                             f"(reservation #{clash[0]['reservation_no']}).")
+
+    @staticmethod
+    def _sync_cancellation(form):
+        form = dict(form.items())   # the submitted form is read-only, so work on a copy
+        cancelled = form.get('col_status', '').strip() == 'Cancelled'
+        has_date = form.get('col_cancel_date', '').strip() != ''
+        if cancelled and not has_date:
+            form['col_cancel_date'] = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')
+        elif has_date and not cancelled:
+            form['col_status'] = 'Cancelled'
+        return form
+
+    def _charge_late_cancellation(self, reservation_no):
+        return self._execute('''
+            INSERT INTO Charge (reservation_no, card_no, amount, reason, charge_type, charge_date)
+            SELECT r.reservation_no, r.card_no, ROUND(SUM(0.20 * rt.rate), 2),
+                   'Late cancellation: 20%% of first night', 'Fee', DATE(r.cancel_date)
+            FROM Reservation r
+            JOIN Reservation_Room rr ON rr.reservation_no = r.reservation_no
+            JOIN Room rm ON rm.hotel_id = rr.hotel_id AND rm.room_no = rr.room_no
+            JOIN Room_Type rt ON rt.hotel_id = rm.hotel_id AND rt.bed = rm.bed
+                             AND rt.smoking = rm.smoking AND rt.`accessible` = rm.`accessible`
+            WHERE r.reservation_no = %s
+            GROUP BY r.reservation_no, r.card_no, r.cancel_date
+            HAVING r.cancel_date > TIMESTAMP(MIN(rr.check_in), '15:00:00') - INTERVAL 48 HOUR
+        ''', (reservation_no,))
+    
+
     def insert_row(self, table, form):
+        if table == 'Reservation_Room':
+            self._check_room_free(form)
+        elif table == 'Reservation':
+            form = self._sync_cancellation(form)
         cols = self._columns(table)
         names, vals = [], []
         for c in cols:
             raw = form.get('col_' + c['name'], '')
             if c['auto'] and raw.strip() == '':
-                continue  # let AUTO_INCREMENT assign it
+                continue
             names.append(f"`{c['name']}`")
             vals.append(self._coerce(c, raw))
         sql = (f"INSERT INTO `{table}` ({', '.join(names)}) "
                f"VALUES ({', '.join(['%s'] * len(vals))})")
-        return self._execute(sql, vals)
+        return self._execute(sql, vals, return_id=True)
 
     def update_row(self, table, form):
+        newly_cancelled = False
+        if table == 'Reservation_Room':
+            self._check_room_free(form)
+        elif table == 'Reservation':
+            form = self._sync_cancellation(form)
+            old = self._query('SELECT status FROM Reservation WHERE reservation_no = %s',
+                              (form.get('pk_reservation_no'),))
+            newly_cancelled = (bool(old) and old[0]['status'] != 'Cancelled'
+                               and form.get('col_status') == 'Cancelled')
         cols = self._columns(table)
         editable = [c for c in cols if not c['auto']]
         sets = ', '.join(f"`{c['name']}` = %s" for c in editable)
         vals = [self._coerce(c, form.get('col_' + c['name'], '')) for c in editable]
         where, pk_vals = self._pk_where(cols, form)
-        return self._execute(f'UPDATE `{table}` SET {sets} WHERE {where}', vals + pk_vals)
+
+        self.conn.begin()
+        try:
+            n = self._execute(f'UPDATE `{table}` SET {sets} WHERE {where}', vals + pk_vals)
+            if newly_cancelled:
+                self._charge_late_cancellation(form.get('pk_reservation_no'))
+            self.conn.commit()
+            return n
+        except Exception:
+            self.conn.rollback()
+            raise
 
     def delete_row(self, table, form):
         cols = self._columns(table)
         where, pk_vals = self._pk_where(cols, form)
-        return self._execute(f'DELETE FROM `{table}` WHERE {where}', pk_vals)
+        return self._execute(f'DELETE FROM `{table}` WHERE {where}', pk_vals) 

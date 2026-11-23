@@ -19,6 +19,14 @@
   </nav>
 
   <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="flash {{ category }}" role="alert">{{ message }}</div>
+    {% endfor %}
+    {% endwith %}
+    <form method="post" action="{{ url_for('query6_charge') }}">
+      <button>Charge no-show fees (20% of first night)</button>
+    </form>
     {% if rows is not none %}{% include '_results.html' %}{% endif %}
   </main>
 </body>
