@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>No-shows</title>
+  <link rel="stylesheet" href="/resources/style.css" />
+</head>
+
+<body>
+  <nav aria-label="Sections">
+    <h1>Query 6</h1>
+    <p>
+      Show the reservation information of those, who have not cancelled their reservation but have not yet checked in
+      and the time is passed the check-in date/time.
+    </p>
+    <p><a href="/">Back</a></p>
+  </nav>
+
+  <main>
+    {% if rows is not none %}{% include '_results.html' %}{% endif %}
+  </main>
+</body>

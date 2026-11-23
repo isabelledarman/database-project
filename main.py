@@ -1,6 +1,6 @@
-"""Command-line front-end for the Hotel database (no web server needed).
+"""Displays all data, no web server needed. Web interface has all queries.
 
-Run with:  python main.py
+Run with:  python3 main.py
 """
 
 import config

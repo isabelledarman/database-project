@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manage Hotel Data</title>
+  <link rel="stylesheet" href="resources/style.css" />
+</head>
+
+<body>
+  {% macro field(c, value, form_id) -%}
+    {%- set req = 'required' if (not c.nullable and not c.auto) else '' -%}
+    {%- if c.kind == 'bool' -%}
+    <select name="col_{{ c.name }}" form="{{ form_id }}" aria-label="{{ c.name }}">
+      <option value="1" {{ 'selected' if value == '1' }}>Yes</option>
+      <option value="0" {{ 'selected' if value != '1' }}>No</option>
+    </select>
+    {%- elif c.kind == 'int' -%}
+    <input type="number" step="1" name="col_{{ c.name }}" form="{{ form_id }}" value="{{ value }}" aria-label="{{ c.name }}" {{ req }}>
+    {%- elif c.kind == 'decimal' -%}
+    <input type="number" step="any" name="col_{{ c.name }}" form="{{ form_id }}" value="{{ value }}" aria-label="{{ c.name }}" {{ req }}>
+    {%- elif c.kind == 'date' -%}
+    <input type="date" name="col_{{ c.name }}" form="{{ form_id }}" value="{{ value }}" aria-label="{{ c.name }}" {{ req }}>
+    {%- elif c.kind == 'datetime' -%}
+    <input type="datetime-local" name="col_{{ c.name }}" form="{{ form_id }}" value="{{ value }}" aria-label="{{ c.name }}" {{ req }}>
+    {%- else -%}
+    <input type="text" name="col_{{ c.name }}" form="{{ form_id }}" value="{{ value }}" {% if c.maxlen %}maxlength="{{ c.maxlen }}"{% endif %} aria-label="{{ c.name }}" {{ req }}>
+    {%- endif -%}
+  {%- endmacro %}
+
+  <nav aria-label="Tables">
+    <h1>Manage Hotel Data</h1>
+    <a href="/">Home</a>
+    <p>Open a table to add, edit or delete rows. Leave an optional field empty to store NULL.
+      A row that other tables still reference cannot be deleted or have its key changed.</p>
+    <h2>Tables</h2>
+    <ul>
+      {% for t in manage %}
+      <li><a href="#manage-{{ t.name }}">{{ t.name|replace('_', ' ') }}</a> <span class="n">{{ t.rows|length }}</span></li>
+      {% endfor %}
+    </ul>
+  </nav>
+
+  <main class="manage">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+  <div class="flash {{ category }}" role="alert">{{ message }}</div>
+  {% endfor %}
+  {% endwith %}
+    {% for t in manage %}
+    <details id="manage-{{ t.name }}">
+      <summary>{{ t.name|replace('_', ' ') }} ({{ t.rows|length }})</summary>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              {% for c in t.columns %}<th>{{ c.name }}{% if c.pk %} (key){% endif %}</th>{% endfor %}
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in t.rows %}
+            {% set fid = 'row-' ~ t.name ~ '-' ~ loop.index %}
+            <tr>
+              {% for c in t.columns %}
+              <td>{% if c.auto %}{{ row[c.name] }}{% else %}{{ field(c, row[c.name], fid) }}{% endif %}</td>
+              {% endfor %}
+              <td>
+                <form id="{{ fid }}" method="post">
+                  {% for c in t.columns if c.pk %}
+                  <input type="hidden" name="pk_{{ c.name }}" value="{{ row[c.name] }}">
+                  {% endfor %}
+                  <button type="submit" formaction="{{ url_for('table_update', table=t.name) }}">Save</button>
+                  <button type="submit" formnovalidate formaction="{{ url_for('table_delete', table=t.name) }}"
+                    onclick="return confirm('Delete this row from {{ t.name }}?')">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="{{ t.columns|length + 1 }}" class="empty">No rows yet.</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            {% set nid = 'new-' ~ t.name %}
+            <tr>
+              {% for c in t.columns %}
+              <td>{% if c.auto %}<em>auto</em>{% else %}{{ field(c, '', nid) }}{% endif %}</td>
+              {% endfor %}
+              <td>
+                <form id="{{ nid }}" method="post" action="{{ url_for('table_insert', table=t.name) }}">
+                  <button type="submit">Add row</button>
+                </form>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </details>
+    {% endfor %}
+  </main>
+
+  <script>
+    // Reopen the table we just edited (the page reloads after every change)
+    function openManage() {
+      var h = location.hash;
+      if (h.indexOf('#manage-') === 0) {
+        var el = document.getElementById(h.slice(1));
+        if (el) { el.open = true; el.scrollIntoView(); }
+      }
+    }
+    window.addEventListener('hashchange', openManage);
+    openManage();
+  </script>
+</body>
+
+</html>

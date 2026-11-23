@@ -1,13 +1,33 @@
-<h2>Available Accessible rooms</h2>
-<form method="get">
-  City:
-  <select name="city">
-    {% for c in cities %}<option>{{ c.city }}</option>{% endfor %}
-  </select>
-  Check-in: <input type="date" name="check_in" required>
-  Check-out: <input type="date" name="check_out" required>
-  <button>Search</button>
-</form>
+<!DOCTYPE html>
+<html lang="en">
 
-{% if rows is not none %}{% include '_results.html' %}{% endif %}
-<p><a href="/">Back</a></p>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accessible Rooms</title>
+  <link rel="stylesheet" href="/resources/style.css" />
+</head>
+
+<body>
+  <nav aria-label="Sections">
+    <h1>Query 2</h1>
+    <p>
+      What are the available rooms for someone who needs to make reservation for a wheel chaired room in any of the hotels in a user requested city?
+    </p>
+    <p><a href="/">Back</a></p>
+  </nav>
+
+  <main>
+    <form method="get">
+      City:
+      <select name="city">
+        {% for c in cities %}<option>{{ c.city }}</option>{% endfor %}
+      </select>
+      Check-in: <input type="date" name="check_in" required>
+      Check-out: <input type="date" name="check_out" required>
+      <button>Search</button>
+    </form>
+
+    {% if rows is not none %}{% include '_results.html' %}{% endif %}
+  </main>
+</body>

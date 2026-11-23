@@ -1,0 +1,31 @@
+-- ============================================
+-- TEST INPUTS (queries in logic.py that take parameters)
+-- ============================================
+-- available_rooms(city, bed, smoking, check_in, check_out)
+--   ('Baltimore',      'Queen',  0, '2026-12-10', '2026-12-12')  -> rooms 102, 201
+--   ('Baltimore',      'Queen',  0, '2026-12-27', '2026-12-30')  -> room 201 only (102 is taken by reservation 5)
+--   ('Baltimore',      'Double', 1, '2026-12-10', '2026-12-12')  -> room 202 (smoking)
+--   ('Washington',     'King',   0, '2026-12-10', '2026-12-12')  -> rooms 301, 1002
+--   ('Virginia Beach', 'Queen',  1, '2026-12-10', '2026-12-12')  -> room 220
+--
+-- available_accessible_rooms(city, check_in, check_out)
+--   ('Washington',     '2026-12-10', '2026-12-12')  -> rooms 302, 1003
+--   ('Washington',     '2026-12-20', '2026-12-23')  -> room 1003 only (302 is taken by reservation 2)
+--   ('Asheville',      '2026-11-20', '2026-11-22')  -> room 21 (reservation 3 is Cancelled, so it does not block)
+--   ('Baltimore',      '2026-12-10', '2026-12-12')  -> room 101
+--   ('Virginia Beach', '2026-12-10', '2026-12-12')  -> room 120
+--
+-- mountain_or_ocean(city)
+--   'Asheville'       -> Pinecrest Lodge (Mountain View rooms)
+--   'Virginia Beach'  -> Seaside Resort  (Ocean View rooms)
+--
+-- reservations_by_person(name, phone_number) and guest_charges_list(name, phone_number)
+--   ('Maya Ortiz',  '4105550101')  -> 3 reservations (#1, #5, #6) = 3 rows; 5 charges
+--   ('Daniel Kim',  '2025550142')  -> 4 reservations (#2, #10, #11, #12) = 5 rows (#2 has two rooms); 5 charges
+--   ('Priya Nair',  '8285550177')  -> 2 reservations (#3 cancelled, #4) = 2 rows; 2 charges
+--   ('Lena Park',   '7575550133')  -> 1 reservation with 2 rooms (#8) = 2 rows; 1 charge
+--
+-- No-input queries that now return rows:
+--   get_cities, get_beds, get_all_data, display_all-style data, reservation_details
+--   no_show_reservations -> 3 rows: reservation 7 (Tom Becker) and reservation 8 (Lena Park, 2 rooms)
+--   bonus_list           -> Daniel Kim (2025) and Maya Ortiz (2026)

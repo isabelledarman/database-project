@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Charges by Person</title>
+  <link rel="stylesheet" href="/resources/style.css" />
+</head>
+
+<body>
+  <nav aria-label="Sections">
+    <h1>Query 5</h1>
+    <p>
+      Given a hotel guest’s name and phone number, list the charges and the date of the charges made to his/her credit card number(s). The charges should be itemized, such as room, food, and or charges for not free amenities used.
+    </p>
+    <p><a href="/">Back</a></p>
+  </nav>
+
+  <main>
+    <form method="get">
+      Name:
+      <input type="text" name="name" placeholder="enter name">
+      Phone:
+      <input type="text" name="phone" placeholder="enter phone">
+      <button>Search</button>
+    </form>
+
+    {% if rows is not none %}{% include '_results.html' %}{% endif %}
+  </main>
+</body>

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bonus Customers</title>
+  <link rel="stylesheet" href="/resources/style.css" />
+</head>
+
+<body>
+  <nav aria-label="Sections">
+    <h1>Query 7</h1>
+    <p>
+      After each reservation is made into the database, the system should identify if that customer has reserved at least three times in year. If that is the case, the system should display the person’s name on monitor and specifying “Will Receive Bonus”.
+    </p>
+    <p><a href="/">Back</a></p>
+  </nav>
+
+  <main>
+    {% if rows is not none %}{% include '_results.html' %}{% endif %}
+  </main>
+</body>

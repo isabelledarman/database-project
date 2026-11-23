@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reservation confirmation</title>
+  <link rel="stylesheet" href="/resources/style.css" />
+  <style>
+    @media print {
+      .no-print { display: none; }
+      body { display: block; }
+    }
+  </style>
+</head>
+
+<body>
+  {% set sel = (selected or request.args.get('reservation_no', ''))|string %}
+
+  <nav class="no-print" aria-label="Sections">
+    <h1>Hotel Database</h1>
+    <p><a href="/">Home</a> | <a href="/manage">Manage data</a></p>
+
+    <p>Show all the information, including the hotel branch and its data/characteristic
+    described above, room type and characteristics, number of nights reserved and rate, and finally the guest’s info. This
+    is something that can be printed and be sent to the person, who made the reservation.</p>
+
+    <h2>Reservation</h2>
+    <form method="get" action="{{ url_for('query8') }}">
+      <label for="reservation_no" hidden>Reservation</label>
+      <select id="reservation_no" name="reservation_no" onchange="this.form.submit()">
+        <option value="">All reservations</option>
+        {% set nums = numbers if numbers else (rows|map(attribute='reservation_no')|unique|list) %}
+        {% for n in nums %}
+        <option value="{{ n }}" {% if sel == n|string %}selected{% endif %}>#{{ n }}</option>
+        {% endfor %}
+      </select>
+      <noscript><button type="submit">Show</button></noscript>
+      <p><button type="button" onclick="window.print()">Print</button></p>
+    </form>
+  </nav>
+
+  <main>
+
+    {% if not rows %}
+    <p class="empty">No reservations found. Choose "All reservations" or add a reservation on the Manage page.</p>
+    {% endif %}
+
+    {% for res_no, items in rows|groupby('reservation_no') %}
+    {% if not sel or sel == res_no|string %}
+    {% set first = items[0] %}
+    <section class="hotel">
+      <header>
+        <div class="hotel-head">
+          <h3>{{ first.hotel_name }}</h3>
+        </div>
+        <p class="address">{{ first.hotel_address }}, {{ first.hotel_city }}</p>
+        <div class="folio-head">
+          <h3>Reservation #{{ res_no }}</h3>
+          <span class="status {{ first.status|lower }}">{{ first.status }}</span>
+        </div>
+        <p class="meta">
+          Booked {{ first.booking_date }}.
+          {% if first.cancel_date %}Cancelled {{ first.cancel_date }}.{% endif %}
+        </p>
+      </header>
+
+      <div class="two-col">
+        <div>
+          <h3>Guest</h3>
+          <dl>
+            <dt>Name: {{ first.guest_name }}</dt>
+            <dt>Phone: {{ first.guest_phone }}</dt>
+            <dt>Address: {{ first.guest_address }}</dt>
+            <dt>Guest ID: {{ first.user_id }}</dt>
+          </dl>
+        </div>
+        <div>
+          <h3>Hotel branch</h3>
+          <dl>
+            <dt>Branch ID: {{ first.hotel_id }}</dt>
+            <dt>City: {{ first.hotel_city }}</dt>
+            <dt>Rating: <span class="rating" role="img" aria-label="{{ first.hotel_rating }} out of 5 stars">{{ '★' * first.hotel_rating }}{{ '☆' * (5 - first.hotel_rating) }}</span></dt>
+          </dl>
+        </div>
+      </div>
+
+      <div class="hotel-extras">
+        <div>
+          <h3>Amenities</h3>
+          {{ first.amenities or 'None listed' }}
+        </div>
+        <div>
+          <h3>Conference rooms</h3>
+          {{ first.conference_rooms or 'None' }}
+        </div>
+      </div>
+
+      <h3>Rooms reserved</h3>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Room</th>
+              <th>Floor</th>
+              <th>Location</th>
+              <th>Bed</th>
+              <th>Type</th>
+              <th>Check-in</th>
+              <th>Check-out</th>
+              <th class="num">Nights</th>
+              <th class="num">Rate</th>
+              <th class="num">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+            <tr>
+              <td>{{ it.room_no }}</td>
+              <td>{{ it.floor }}</td>
+              <td>{{ it.location }}</td>
+              <td>{{ it.bed }}</td>
+              <td>{{ 'Smoking' if it.smoking else 'Non-smoking' }}, {{ 'Accessible' if it.accessible else 'Standard' }}</td>
+              <td>{{ it.check_in }}</td>
+              <td>{{ it.check_out }}</td>
+              <td class="num">{{ it.nights }}</td>
+              <td class="num">${{ '{:,.2f}'.format(it.rate_per_night) }}</td>
+              <td class="num">${{ '{:,.2f}'.format(it.room_total) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="9">Total room charges</td>
+              <td class="num">${{ '{:,.2f}'.format(items|sum(attribute='room_total')) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+    {% endfor %}
+
+  </main>
+</body>
+
+</html>

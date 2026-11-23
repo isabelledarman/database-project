@@ -5,6 +5,7 @@ Both front-ends use this same class:
   - main.py  (command-line app, no web server)
 """
 
+import datetime
 import pymysql
 
 # Every table in the schema, parents first (matches the order in schema.sql)
@@ -12,7 +13,7 @@ TABLES = [
     'Hotel', 'Amenity', 'Hotel_Amenity', 'Conference_Room',
     'Room_Location', 'Room_Bed', 'Room_Type', 'Room',
     'Guest', 'Credit_Card', 'Reservation', 'Reservation_Room',
-    'Charge', 'Bonus',
+    'Charge',
 ]
 
 
@@ -126,7 +127,7 @@ class Database(object):
             GROUP BY g.user_id, g.name, g.phone, g.address
             ORDER BY g.user_id''')
         bonuses = self._query('''
-            SELECT g.name AS guest_name, b.year, b.mailed_date
+            SELECT g.name AS guest_name, b.year
             FROM Bonus b
             JOIN Guest g ON g.user_id = b.user_id
             ORDER BY b.year, g.name''')
@@ -190,7 +191,7 @@ class Database(object):
 
         print(f"\n{line}\nBONUS MAILINGS\n{line}")
         for b in data['bonuses']:
-            print(f"  {b['year']}  {b['guest_name']:<14} mailed {b['mailed_date']}")
+            print(f"  {b['year']}  {b['guest_name']:<14}")
 
         print(f"\n{line}\nROW COUNTS\n{line}")
         for table, n in data['counts'].items():
@@ -200,11 +201,11 @@ class Database(object):
         return self._query('SELECT DISTINCT city FROM Hotel ORDER BY city')
 
     def get_beds(self):
-            return self._query('SELECT bed FROM Room_bed ORDER BY bed')
+            return self._query('SELECT bed FROM Room_Bed ORDER BY bed')
 
     def available_rooms(self, city, bed, smoking, check_in, check_out):
         return self._query('''
-            SELECT h.name as hotel, r.room_no AS room, r.floor, r.location, r.bed, IF(r.accessible, 'Yes', 'No') AS acessible, rt.rate
+            SELECT h.name as hotel, r.room_no AS room, r.floor, r.location, r.bed, r.accessible, rt.rate
             FROM Room r
             JOIN Hotel h ON h.hotel_id = r.hotel_id
             JOIN Room_Type rt ON rt.hotel_id = r.hotel_id AND rt.bed = r.bed AND rt.smoking = r.smoking AND rt.accessible = r.accessible
@@ -260,4 +261,196 @@ class Database(object):
         ''',
         (name, phone_number))
 
+    def guest_charges_list(self, name, phone_number):
+        return self._query('''
+            SELECT c.charge_id, c.reservation_no, c.card_no, c.charge_type,
+                c.reason, c.amount, c.charge_date
+            FROM Guest g
+            JOIN Reservation r ON r.user_id = g.user_id
+            JOIN Charge c ON c.reservation_no = r.reservation_no
+            WHERE g.name = %s AND g.phone = %s
+            ORDER BY c.charge_date, c.charge_id
+        ''',
+        (name, phone_number))
+
+    def no_show_reservations(self):
+        return self._query('''
+            SELECT r.reservation_no, r.booking_date, r.status,
+                g.user_id, g.name AS guest_name, g.phone,
+                h.hotel_id, h.name AS hotel_name,
+                rr.room_no, rr.check_in, rr.check_out
+            FROM Reservation r
+            JOIN Guest g ON g.user_id = r.user_id
+            JOIN Reservation_Room rr ON rr.reservation_no = r.reservation_no
+            JOIN Hotel h ON h.hotel_id = rr.hotel_id
+            WHERE r.cancel_date IS NULL AND r.status = 'Confirmed' AND rr.check_in < CURDATE()
+            ORDER BY rr.check_in, r.reservation_no, rr.room_no
+        ''')
     
+    def bonus_list(self):
+        return self._query('''
+            SELECT g.name, g.phone, b.year, 'Will receive bonus' as status
+            FROM Bonus b
+            JOIN Guest g ON g.user_id = b.user_id
+            ORDER BY b.year, g.name
+        ''')
+
+    def reservation_details(self):
+        return self._query('''
+            SELECT
+                -- reservation
+                r.reservation_no, r.booking_date, r.status, r.cancel_date,
+                -- guest
+                g.user_id, g.name AS guest_name, g.phone AS guest_phone, g.address AS guest_address,
+                -- hotel branch
+                h.hotel_id, h.name AS hotel_name, h.address AS hotel_address, h.city AS hotel_city, h.rating AS hotel_rating,
+                (SELECT GROUP_CONCAT(
+                    CONCAT(a.name, ' (',
+                        IF(ha.charge = 0, 'free', CONCAT('$', ha.charge)),
+                            ')')
+                        ORDER BY a.name SEPARATOR ', ')
+                    FROM Hotel_Amenity ha
+                    JOIN Amenity a ON a.amenity_id = ha.amenity_id
+                WHERE ha.hotel_id = h.hotel_id) AS amenities,
+                (SELECT GROUP_CONCAT(
+                    CONCAT('Room ', cr.conf_room_no,
+                        ' (', cr.capacity, ' seats)')
+                    ORDER BY cr.conf_room_no SEPARATOR ', ')
+                FROM Conference_Room cr
+                WHERE cr.hotel_id = h.hotel_id) AS conference_rooms,
+                -- room and room type
+                rm.room_no, rm.floor, rm.location, rt.bed, rt.smoking, rt.`accessible`,
+                -- stay and cost
+                rr.check_in, rr.check_out, DATEDIFF(rr.check_out, rr.check_in) AS nights,
+                rt.rate AS rate_per_night, DATEDIFF(rr.check_out, rr.check_in) * rt.rate AS room_total
+            FROM Reservation r
+            JOIN Guest g ON g.user_id = r.user_id
+            JOIN Reservation_Room rr ON rr.reservation_no = r.reservation_no
+            JOIN Room rm ON rm.hotel_id = rr.hotel_id AND rm.room_no  = rr.room_no
+            JOIN Room_Type rt ON rt.hotel_id = rm.hotel_id AND rt.bed = rm.bed AND rt.smoking = rm.smoking AND rt.`accessible` = rm.`accessible`
+            JOIN Hotel h ON h.hotel_id = rm.hotel_id
+            ORDER BY r.reservation_no, rr.room_no
+        ''')
+
+    # ---------- Generic add / edit / delete for ANY table ----------
+    # Column names come from information_schema and table names are checked
+    # against TABLES, so only values (never identifiers) come from the user,
+    # and values always go through %s placeholders.
+
+    def _check_table(self, table):
+        if table not in TABLES:
+            raise ValueError(f'Unknown table: {table}')
+
+    def _columns(self, table):
+        """Describe a table's columns: name, input kind, nullable, auto-increment, primary key."""
+        self._check_table(table)
+        rows = self._query('''
+            SELECT COLUMN_NAME AS name, DATA_TYPE AS data_type, COLUMN_TYPE AS column_type,
+                   IS_NULLABLE AS nullable, COLUMN_KEY AS col_key, EXTRA AS extra,
+                   CHARACTER_MAXIMUM_LENGTH AS maxlen
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s
+            ORDER BY ORDINAL_POSITION''', (table,))
+        cols = []
+        for r in rows:
+            dt = r['data_type'].lower()
+            if r['column_type'].lower().startswith('tinyint(1)'):
+                kind = 'bool'
+            elif dt in ('tinyint', 'smallint', 'mediumint', 'int', 'bigint'):
+                kind = 'int'
+            elif dt in ('decimal', 'float', 'double'):
+                kind = 'decimal'
+            elif dt == 'date':
+                kind = 'date'
+            elif dt in ('datetime', 'timestamp'):
+                kind = 'datetime'
+            else:
+                kind = 'text'
+            cols.append({
+                'name': r['name'],
+                'kind': kind,
+                'nullable': r['nullable'] == 'YES',
+                'auto': 'auto_increment' in (r['extra'] or '').lower(),
+                'pk': r['col_key'] == 'PRI',
+                'maxlen': r['maxlen'],
+            })
+        return cols
+
+    @staticmethod
+    def _to_form(col, value):
+        """Format a DB value as the string an HTML input expects."""
+        if value is None:
+            return ''
+        if col['kind'] == 'bool':
+            return '1' if value else '0'
+        if isinstance(value, datetime.datetime):
+            return value.strftime('%Y-%m-%dT%H:%M')
+        if isinstance(value, datetime.date):
+            return value.isoformat()
+        return str(value)
+
+    @staticmethod
+    def _coerce(col, raw):
+        """Turn a submitted form string into a value for the DB ('' becomes NULL if allowed)."""
+        raw = (raw or '').strip()
+        if raw == '':
+            if col['nullable'] or col['auto']:
+                return None
+            raise ValueError(f"{col['name']} is required.")
+        if col['kind'] == 'datetime':
+            raw = raw.replace('T', ' ')
+        return raw
+
+    def _execute(self, sql, params=()):
+        cur = self.conn.cursor()
+        try:
+            cur.execute(sql, params)
+            return cur.rowcount
+        finally:
+            cur.close()
+
+    @staticmethod
+    def _pk_where(cols, form):
+        pk = [c for c in cols if c['pk']]
+        where = ' AND '.join(f"`{c['name']}` = %s" for c in pk)
+        return where, [form.get('pk_' + c['name'], '') for c in pk]
+
+    def get_manage_data(self):
+        """Every table with its column info and rows, ready for the edit forms."""
+        tables = []
+        for table in TABLES:
+            cols = self._columns(table)
+            order = ', '.join(f"`{c['name']}`" for c in cols if c['pk'])
+            rows = self._query(f'SELECT * FROM `{table}` ORDER BY {order}')
+            tables.append({
+                'name': table,
+                'columns': cols,
+                'rows': [{c['name']: self._to_form(c, r[c['name']]) for c in cols} for r in rows],
+            })
+        return tables
+
+    def insert_row(self, table, form):
+        cols = self._columns(table)
+        names, vals = [], []
+        for c in cols:
+            raw = form.get('col_' + c['name'], '')
+            if c['auto'] and raw.strip() == '':
+                continue  # let AUTO_INCREMENT assign it
+            names.append(f"`{c['name']}`")
+            vals.append(self._coerce(c, raw))
+        sql = (f"INSERT INTO `{table}` ({', '.join(names)}) "
+               f"VALUES ({', '.join(['%s'] * len(vals))})")
+        return self._execute(sql, vals)
+
+    def update_row(self, table, form):
+        cols = self._columns(table)
+        editable = [c for c in cols if not c['auto']]
+        sets = ', '.join(f"`{c['name']}` = %s" for c in editable)
+        vals = [self._coerce(c, form.get('col_' + c['name'], '')) for c in editable]
+        where, pk_vals = self._pk_where(cols, form)
+        return self._execute(f'UPDATE `{table}` SET {sets} WHERE {where}', vals + pk_vals)
+
+    def delete_row(self, table, form):
+        cols = self._columns(table)
+        where, pk_vals = self._pk_where(cols, form)
+        return self._execute(f'DELETE FROM `{table}` WHERE {where}', pk_vals)
