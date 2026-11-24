@@ -435,59 +435,6 @@ class LogicIntegrationTests(unittest.TestCase):
 
     # Insert, update, delete operations
 
-    def test_insert_update_delete(self):
-        inserted = self.db.insert_row(
-            "Amenity",
-            {"col_amenity_id": "99", "col_name": "Test Amenity"},
-        )
-        inserted_rows = self.db._query(
-            "SELECT name FROM Amenity WHERE amenity_id = %s", (99,)
-        )
-        insert_ok = len(inserted_rows) == 1 and inserted_rows[0]["name"] == "Test Amenity"
-        self.check_case(
-            ("INSERT Amenity", {"amenity_id": 99, "name": "Test Amenity"}),
-            f"matching rows={len(inserted_rows)}; insert_row returned {inserted}",
-            insert_ok,
-            "expected the new Amenity row to exist",
-        )
-
-        updated = self.db.update_row(
-            "Amenity",
-            {
-                "pk_amenity_id": "99",
-                "col_amenity_id": "99",
-                "col_name": "Updated Amenity",
-            },
-        )
-        updated_rows = self.db._query(
-            "SELECT name FROM Amenity WHERE amenity_id = %s", (99,)
-        )
-        update_ok = (
-            updated == 1
-            and len(updated_rows) == 1
-            and updated_rows[0]["name"] == "Updated Amenity"
-        )
-        self.check_case(
-            ("UPDATE Amenity", {"pk_amenity_id": 99, "name": "Updated Amenity"}),
-            f"update_row returned {updated}; stored name="
-            f"{updated_rows[0]['name'] if updated_rows else 'missing'}",
-            update_ok,
-            "expected one updated row with name 'Updated Amenity'",
-        )
-
-        deleted = self.db.delete_row("Amenity", {"pk_amenity_id": "99"})
-        remaining = self.db._query(
-            "SELECT COUNT(*) AS n FROM Amenity WHERE amenity_id = %s", (99,)
-        )[0]["n"]
-        delete_ok = deleted == 1 and remaining == 0
-        self.check_case(
-            ("DELETE Amenity", {"pk_amenity_id": 99}),
-            f"delete_row returned {deleted}; remaining rows={remaining}",
-            delete_ok,
-            "expected one deleted row and no remaining matching rows",
-        )
-
-
     def test_insert_update_delete_each_table(self):
         """Full insert -> update -> delete round trip for every table without an auto id."""
         for table, new_row, changed_row in CRUD_CASES:
