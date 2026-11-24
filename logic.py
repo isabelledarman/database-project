@@ -203,6 +203,7 @@ class Database(object):
     def get_beds(self):
             return self._query('SELECT bed FROM Room_Bed ORDER BY bed')
 
+    # Query 1
     def available_rooms(self, city, bed, smoking, check_in, check_out):
         return self._query('''
             SELECT h.name as hotel, r.room_no AS room, r.floor, r.location, r.bed, r.accessible, rt.rate
@@ -220,6 +221,7 @@ class Database(object):
         ''',
         (city, bed, smoking, check_out, check_in))
 
+    # Query 2
     def available_accessible_rooms(self, city, check_in, check_out):
         return self._query('''
             SELECT h.name AS hotel, r.room_no AS room, r.floor, r.location, r.bed, IF(r.smoking, 'Smoking', 'Non-smoking') AS smoking, rt.rate
@@ -237,6 +239,7 @@ class Database(object):
         ''',
         (city, check_out, check_in))
 
+    # Query 3
     def mountain_or_ocean(self, city=None):
         return self._query('''
             SELECT DISTINCT h.city, h.name AS name, h.address, GROUP_CONCAT(ha.area ORDER BY ha.area SEPARATOR ', ') AS next_to
@@ -249,6 +252,7 @@ class Database(object):
         ''',
         (city or None, city or None))
 
+    # Query 4
     def reservations_by_person(self, name, phone_number):
         return self._query('''
             SELECT g.user_id, g.name, g.phone, r.reservation_no, r.status, r.booking_date,
@@ -262,6 +266,7 @@ class Database(object):
         ''',
         (name, phone_number))
 
+    # Query 5
     def guest_charges_list(self, name, phone_number):
         return self._query('''
             SELECT c.charge_id, c.reservation_no, c.card_no, c.charge_type,
@@ -274,6 +279,7 @@ class Database(object):
         ''',
         (name, phone_number))
 
+    # Query 6
     def no_show_reservations(self):
         return self._query('''
             SELECT r.reservation_no, r.booking_date, r.status,
@@ -288,6 +294,7 @@ class Database(object):
             ORDER BY rr.check_in, r.reservation_no, rr.room_no
         ''')
 
+    # Query 6 helper - could also be automated, but it's outside the scope of the project
     def charge_no_show_fees(self):
         return self._execute('''
             INSERT INTO Charge (reservation_no, card_no, amount, reason, charge_type, charge_date)
@@ -300,17 +307,8 @@ class Database(object):
             GROUP BY r.reservation_no, r.card_no
             HAVING TIMESTAMP(MIN(rr.check_in), '15:00:00') < NOW()
         ''')
-
-    def bonus_for_reservation(self, reservation_no):
-        rows = self._query('''
-            SELECT g.name
-            FROM Reservation r
-            JOIN Bonus b on b.user_id = r.user_id AND b.year = YEAR(r.booking_date)
-            JOIN Guest g on g.user_id = r.user_id
-            WHERE r.reservation_no = %s
-        ''', (reservation_no,))
-        return rows[0]['name'] if rows else None
     
+    # Query 7
     def bonus_list(self):
         return self._query('''
             SELECT g.name, g.phone, b.year, 'Will Receive Bonus' as status
@@ -319,6 +317,7 @@ class Database(object):
             ORDER BY b.year, g.name
         ''')
 
+    # Query 8 - "universal relation" formatting/returning all reservation info
     def reservation_details(self):
         return self._query('''
             SELECT
@@ -457,7 +456,7 @@ class Database(object):
     def _check_room_free(self, form):
         check_in = form.get('col_check_in', '').strip()
         check_out = form.get('col_check_out', '').strip()
-        if check_in and check_out and check_out <= check_in:   # ISO dates compare correctly as text
+        if check_in and check_out and check_out <= check_in: # ISO dates compare correctly as text
             raise ValueError('Check-out must be after check-in.')
         clash = self._query('''
             SELECT rr.reservation_no
@@ -473,6 +472,17 @@ class Database(object):
         if clash:
             raise ValueError(f"That room is already booked for some of those nights "
                              f"(reservation #{clash[0]['reservation_no']}).")
+
+    # Check whether guest will receive bonus after inserting new reservation row
+    def bonus_for_reservation(self, reservation_no):
+        rows = self._query('''
+            SELECT g.name
+            FROM Reservation r
+            JOIN Bonus b on b.user_id = r.user_id AND b.year = YEAR(r.booking_date)
+            JOIN Guest g on g.user_id = r.user_id
+            WHERE r.reservation_no = %s
+        ''', (reservation_no,))
+        return rows[0]['name'] if rows else None
 
     @staticmethod
     def _sync_cancellation(form):
